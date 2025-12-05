@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Planck Racer 2.5D</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚙</text></svg>">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main class="game-container">
+        <canvas id="game-canvas"></canvas>
+    </main>
+
+    <div id="hud">
+        <div class="hud-item">Speed: <span id="speed-value">0</span> km/h</div>
+        <div class="hud-item">RPM: <span id="rpm-value">0</span></div>
+        <div class="hud-item">Fuel: <span id="fuel-value">100</span>%</div>
+        <div class="hud-item">Distance: <span id="distance-value">0</span> m</div>
+        <div class="hud-item">Slope: <span id="slope-value">0</span>%</div>
+        <div class="hud-item">Angle: <span id="angle-value">0</span>°</div>
+        <div class="hud-item">Torque: <span id="torque-value">0</span></div>
+    </div>
+
+    <div id="help-panel" class="overlay-panel hidden">
+        <h2>🚙 Planck Racer 2.5D</h2>
+        <h3>✨ Features</h3>
+        <ul>
+            <li><b>Three.js Rendering</b> with dynamic shadows and procedural extrusion.</li>
+            <li><b>Planck.js physics</b> (120Hz simulation).</li>
+            <li><b>Procedural terrain</b> generation and culling.</li>
+        </ul>
+        <h3>🎮 Controls</h3>
+        <table>
+            <thead><tr><th>Action</th><th>Keyboard</th><th>Mobile</th></tr></thead>
+            <tbody>
+                <tr><td>Throttle</td><td>↑</td><td><b>Gas</b></td></tr>
+                <tr><td>Brake</td><td>↓</td><td><b>Brake</b></td></tr>
+                <tr><td>Pitch (Air)</td><td>← / →</td><td>◄ / ►</td></tr>
+                <tr><td>Reset</td><td>R</td><td>—</td></tr>
+                <tr><td>Pause</td><td>Space</td><td>—</td></tr>
+                <tr><td>Debug</td><td>D</td><td>—</td></tr>
+            </tbody>
+        </table>
+        <button id="close-help-btn">Close</button>
+    </div>
+    
+    <div id="mobile-controls">
+        <div class="mobile-left">
+            <button id="tilt-backward-btn" class="mobile-btn">◄</button>
+            <button id="tilt-forward-btn" class="mobile-btn">►</button>
+        </div>
+        <div class="mobile-right">
+            <button id="brake-btn" class="mobile-btn">Brake</button>
+            <button id="throttle-btn" class="mobile-btn">Gas</button>
+        </div>
+    </div>
+
+    <div id="game-over-panel" class="overlay-panel hidden">
+        <h2>GAME OVER</h2>
+        <p>Out of fuel!</p>
+        <p>Press 'R' to restart.</p>
+        <button id="restart-btn">Restart</button>
+    </div>
+
+    <div id="help-toggle-button">Press 'H' for Help</div>
+
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/planck@latest/dist/planck.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Main Game Logic -->
+    <script src="script.js"></script>
+</body>
+</html>
