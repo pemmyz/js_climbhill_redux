@@ -4,7 +4,6 @@ window.addEventListener('load', () => {
 
     // A. CONFIG
     const PPM = 1; 
-    // [OPTIMIZATION] Reduced to 60Hz. 120Hz is heavy for JS if not optimized perfectly.
     const PHYSICS_STEP = 1 / 60; 
     const MAX_ACCUMULATOR_STEPS = 5;
 
@@ -20,10 +19,10 @@ window.addEventListener('load', () => {
         AIR_CONTROL_TORQUE: 1800, AIR_CONTROL_DAMPING: 30
     };
 
+    // [RESTORED] Original terrain parameters to prevent frequent generation stutter
     const TERRAIN_PARAMS = { 
         SEGMENT_LENGTH: 100, 
-        // [OPTIMIZATION] Increased sample distance. Fewer points = less physics/geometry work.
-        SAMPLE_DISTANCE: 1.5, 
+        SAMPLE_DISTANCE: 1.2, // Balanced for visual quality vs performance
         MAX_SLOPE: 0.8, 
         GENERATION_THRESHOLD: 200, 
         CULLING_THRESHOLD: 150, 
@@ -32,11 +31,10 @@ window.addEventListener('load', () => {
     const GAME_PARAMS = { FUEL_START: 100, FUEL_DRAIN_RATE: 0.5, CHECKPOINT_DISTANCE: 150 };
 
     const clamp = (val, min, max) => Math.max(min, Math.min(val, max));
-    const lerp = (a, b, t) => a * (1 - t) + b * t;
 
     // B. GLOBALS
     const pl = planck, Vec2 = pl.Vec2;
-    let world, vehicle, terrainManager, cameraFollow;
+    let world, vehicle, terrainManager;
     let scene, camera, renderer, sunLight;
     let gameState = { paused: false, debug: false, gameOver: false, distance: 0, fuel: GAME_PARAMS.FUEL_START, lastCheckpoint: null };
 
@@ -46,25 +44,23 @@ window.addEventListener('load', () => {
         
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87CEEB);
-        scene.fog = new THREE.Fog(0x87CEEB, 20, 60);
+        scene.fog = new THREE.Fog(0x87CEEB, 20, 80);
 
         camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 5, 20);
+        camera.position.set(0, 5, 25);
 
         renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: "high-performance" });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
-        // [OPTIMIZATION] PCFShadowMap is faster than PCFSoftShadowMap
         renderer.shadowMap.type = THREE.PCFShadowMap; 
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
 
         sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
         sunLight.position.set(10, 20, 10);
         sunLight.castShadow = true;
         
-        // [OPTIMIZATION] Reduced shadow map size to save GPU memory/processing
         sunLight.shadow.mapSize.width = 1024;
         sunLight.shadow.mapSize.height = 1024;
         sunLight.shadow.camera.near = 0.5;
@@ -119,8 +115,13 @@ window.addEventListener('load', () => {
 
     function removeBodyAndMesh(body) {
         if (body.getUserData() && body.getUserData().mesh) {
-            scene.remove(body.getUserData().mesh);
-            if (body.getUserData().mesh.geometry) body.getUserData().mesh.geometry.dispose();
+            const mesh = body.getUserData().mesh;
+            scene.remove(mesh);
+            if (mesh.geometry) mesh.geometry.dispose();
+            if (mesh.material) {
+                if (Array.isArray(mesh.material)) mesh.material.forEach(m => m.dispose());
+                else mesh.material.dispose();
+            }
         }
         world.destroyBody(body);
     }
@@ -203,7 +204,6 @@ window.addEventListener('load', () => {
             points.push(Vec2(startX, lastY));
             vPoints.push(new THREE.Vector2(startX, lastY));
 
-            // [OPTIMIZATION] Loop step uses SAMPLE_DISTANCE which we increased
             for (let x = startX + TERRAIN_PARAMS.SAMPLE_DISTANCE; x <= startX + TERRAIN_PARAMS.SEGMENT_LENGTH; x += TERRAIN_PARAMS.SAMPLE_DISTANCE) {
                 let y = heightFn(x);
                 const slope = (y - lastY) / TERRAIN_PARAMS.SAMPLE_DISTANCE;
@@ -225,7 +225,7 @@ window.addEventListener('load', () => {
             const geometry = new THREE.ExtrudeGeometry(shape, {
                 depth: 20,
                 bevelEnabled: false,
-                steps: 1 // [OPTIMIZATION] Only 1 step along depth needed
+                steps: 1 
             });
             geometry.translate(0, 0, -10);
 
@@ -237,6 +237,9 @@ window.addEventListener('load', () => {
             
             const mesh = new THREE.Mesh(geometry, material);
             mesh.receiveShadow = true;
+            mesh.matrixAutoUpdate = false; 
+            mesh.updateMatrix();
+
             scene.add(mesh);
             
             body.setUserData({ mesh: mesh, type: 'ground' });
@@ -259,8 +262,9 @@ window.addEventListener('load', () => {
         return {
             init() { generate(-TERRAIN_PARAMS.SEGMENT_LENGTH); generate(0); },
             update(camX) {
+                // Original Logic: Look ahead larger distance, delete later
                 if (camX > lastGenX - TERRAIN_PARAMS.GENERATION_THRESHOLD) generate(lastGenX);
-                if (segments.length && camX > segments[0].endX + TERRAIN_PARAMS.CULLING_THRESHOLD) {
+                if (segments.length > 0 && camX > segments[0].endX + TERRAIN_PARAMS.CULLING_THRESHOLD) {
                     removeBodyAndMesh(segments[0].body);
                     segments.shift();
                 }
@@ -396,8 +400,7 @@ window.addEventListener('load', () => {
 
     // H. MAIN LOOP
     let lastTime = 0, accumulator = 0;
-    cameraFollow = { x: 0, y: 0 };
-    let frameCount = 0; // [OPTIMIZATION] Counter for DOM throttling
+    let frameCount = 0; 
 
     function gameLoop(time) {
         requestAnimationFrame(gameLoop);
@@ -416,7 +419,6 @@ window.addEventListener('load', () => {
         }
 
         accumulator += dt;
-        // [OPTIMIZATION] Prevent Spiral of Death by capping accumulator
         if(accumulator > 0.1) accumulator = 0.1;
 
         while (accumulator >= PHYSICS_STEP && accumulator < MAX_ACCUMULATOR_STEPS * PHYSICS_STEP) {
@@ -441,39 +443,37 @@ window.addEventListener('load', () => {
             }
         }
 
-        const targetPos = vehicle.chassis.getPosition();
-        const vel = vehicle.chassis.getLinearVelocity();
-        const tx = targetPos.x + vel.x * 0.5;
-        const ty = targetPos.y + vel.y * 0.2 + 2;
+        // Camera Update (Fixed Distance)
+        const carPos = vehicle.chassis.getPosition();
         
-        cameraFollow.x = lerp(cameraFollow.x, tx, 3 * dt);
-        cameraFollow.y = lerp(cameraFollow.y, ty, 3 * dt);
+        // FIXED OFFSET - No lerp, no smoothing, exactly matches physics body
+        camera.position.x = carPos.x + 8; // Keep car slightly to left of center
+        camera.position.y = carPos.y + 6; // Height
+        camera.position.z = 28;           // Distance
         
-        camera.position.x = cameraFollow.x;
-        camera.position.y = cameraFollow.y;
-        camera.position.z = 20 + Math.abs(vel.x) * 0.2; 
-        camera.lookAt(cameraFollow.x, cameraFollow.y, 0);
+        // Look at car
+        camera.lookAt(carPos.x + 6, carPos.y, 0);
 
-        sunLight.position.set(cameraFollow.x + 10, cameraFollow.y + 20, 10);
-        sunLight.target.position.set(cameraFollow.x, cameraFollow.y, 0);
+        // Light follows exact car position
+        sunLight.position.set(carPos.x + 10, carPos.y + 20, 10);
+        sunLight.target.position.set(carPos.x, carPos.y, 0);
         sunLight.target.updateMatrixWorld();
 
         terrainManager.update(camera.position.x);
         if (vehicle.chassis.getPosition().y < -30) input.handleReset();
 
-        // [OPTIMIZATION] Throttle DOM and Raycast updates to every 10 frames
+        // Throttle DOM
         frameCount++;
         if (frameCount % 10 === 0) {
             document.getElementById('speed-value').textContent = (vehicle.chassis.getLinearVelocity().length() * 3.6).toFixed(0);
             document.getElementById('rpm-value').textContent = Math.abs(vehicle.rear.getAngularVelocity() * 10).toFixed(0);
             document.getElementById('fuel-value').textContent = gameState.fuel.toFixed(0);
             
-            // Expensive calculation:
-            document.getElementById('slope-value').textContent = (terrainManager.getSlope(targetPos.x)*100).toFixed(0);
+            document.getElementById('slope-value').textContent = (terrainManager.getSlope(carPos.x)*100).toFixed(0);
             
             document.getElementById('angle-value').textContent = ((vehicle.chassis.getAngle()*180/Math.PI)%360).toFixed(0);
             document.getElementById('torque-value').textContent = vehicle.totalTorque.toFixed(0);
-            gameState.distance = Math.max(gameState.distance, targetPos.x);
+            gameState.distance = Math.max(gameState.distance, carPos.x);
             document.getElementById('distance-value').textContent = gameState.distance.toFixed(1);
         }
         
