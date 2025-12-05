@@ -3,8 +3,9 @@
 window.addEventListener('load', () => {
 
     // A. CONFIG
-    const PPM = 1; // 1 Physics Meter = 1 Three.js Unit
-    const PHYSICS_STEP = 1 / 120;
+    const PPM = 1; 
+    // [OPTIMIZATION] Reduced to 60Hz. 120Hz is heavy for JS if not optimized perfectly.
+    const PHYSICS_STEP = 1 / 60; 
     const MAX_ACCUMULATOR_STEPS = 5;
 
     const VEHICLE_PARAMS = {
@@ -19,7 +20,15 @@ window.addEventListener('load', () => {
         AIR_CONTROL_TORQUE: 1800, AIR_CONTROL_DAMPING: 30
     };
 
-    const TERRAIN_PARAMS = { SEGMENT_LENGTH: 100, SAMPLE_DISTANCE: 0.8, MAX_SLOPE: 0.8, GENERATION_THRESHOLD: 200, CULLING_THRESHOLD: 150, A1: 0.8, F1: 0.4, P1: 0, A2: 0.3, F2: 1.2, P2: 0 };
+    const TERRAIN_PARAMS = { 
+        SEGMENT_LENGTH: 100, 
+        // [OPTIMIZATION] Increased sample distance. Fewer points = less physics/geometry work.
+        SAMPLE_DISTANCE: 1.5, 
+        MAX_SLOPE: 0.8, 
+        GENERATION_THRESHOLD: 200, 
+        CULLING_THRESHOLD: 150, 
+        A1: 0.8, F1: 0.4, P1: 0, A2: 0.3, F2: 1.2, P2: 0 
+    };
     const GAME_PARAMS = { FUEL_START: 100, FUEL_DRAIN_RATE: 0.5, CHECKPOINT_DISTANCE: 150 };
 
     const clamp = (val, min, max) => Math.max(min, Math.min(val, max));
@@ -35,32 +44,29 @@ window.addEventListener('load', () => {
     function initGraphics() {
         const canvas = document.getElementById('game-canvas');
         
-        // Scene
         scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB); // Sky blue
+        scene.background = new THREE.Color(0x87CEEB);
         scene.fog = new THREE.Fog(0x87CEEB, 20, 60);
 
-        // Camera
         camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 5, 20);
 
-        // Renderer
-        renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+        renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: "high-performance" });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        // [OPTIMIZATION] PCFShadowMap is faster than PCFSoftShadowMap
+        renderer.shadowMap.type = THREE.PCFShadowMap; 
 
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
         scene.add(ambientLight);
 
         sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
         sunLight.position.set(10, 20, 10);
         sunLight.castShadow = true;
         
-        // Shadow properties
-        sunLight.shadow.mapSize.width = 2048;
-        sunLight.shadow.mapSize.height = 2048;
+        // [OPTIMIZATION] Reduced shadow map size to save GPU memory/processing
+        sunLight.shadow.mapSize.width = 1024;
+        sunLight.shadow.mapSize.height = 1024;
         sunLight.shadow.camera.near = 0.5;
         sunLight.shadow.camera.far = 100;
         sunLight.shadow.camera.left = -30;
@@ -69,7 +75,6 @@ window.addEventListener('load', () => {
         sunLight.shadow.camera.bottom = -30;
         scene.add(sunLight);
 
-        // Resize handler
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
@@ -89,13 +94,11 @@ window.addEventListener('load', () => {
         const dA = getData(contact.getFixtureA()), dB = getData(contact.getFixtureB());
         if(!dA || !dB) return;
         
-        // Grounding
         const checkGround = (w, g) => {
             if (w.type === 'wheel' && g.type === 'ground') w.owner.setGrounded(w.wheelId, isBeginning);
         };
         checkGround(dA, dB); checkGround(dB, dA);
 
-        // Collectibles
         if (isBeginning) {
             const checkCol = (c, item, fix) => {
                 if (c.type === 'chassis') {
@@ -127,16 +130,21 @@ window.addEventListener('load', () => {
         throttle: 0, brake: 0, pitch: 0, keys: new Set(),
         init() {
             const helpPanel = document.getElementById('help-panel');
-            document.getElementById('help-toggle-button').onclick = () => helpPanel.classList.toggle('hidden');
-            document.getElementById('close-help-btn').onclick = () => helpPanel.classList.add('hidden');
-            document.getElementById('restart-btn').onclick = () => this.handleReset();
+            const toggleHelp = () => helpPanel.classList.toggle('hidden');
+            const helpBtn = document.getElementById('help-toggle-button');
+            const closeBtn = document.getElementById('close-help-btn');
+            const restartBtn = document.getElementById('restart-btn');
+
+            if(helpBtn) helpBtn.onclick = toggleHelp;
+            if(closeBtn) closeBtn.onclick = () => helpPanel.classList.add('hidden');
+            if(restartBtn) restartBtn.onclick = () => this.handleReset();
 
             window.addEventListener('keydown', e => this.keys.add(e.code));
             window.addEventListener('keyup', e => {
                 this.keys.delete(e.code);
                 if (e.code === 'KeyR') this.handleReset();
                 if (e.code === 'Space') gameState.paused = !gameState.paused;
-                if (e.code === 'KeyH') helpPanel.classList.toggle('hidden');
+                if (e.code === 'KeyH') toggleHelp();
                 if (e.code === 'KeyD') {
                     gameState.debug = !gameState.debug;
                     scene.traverse(o => { if(o.name === 'debug') o.visible = gameState.debug; });
@@ -161,7 +169,6 @@ window.addEventListener('load', () => {
             this.brake = this.keys.has('ArrowDown') ? 1 : 0;
             this.pitch = (this.keys.has('ArrowRight') ? 1 : 0) - (this.keys.has('ArrowLeft') ? 1 : 0);
             
-            // Check mobile button state fallback if elements exist
             const tBtn = document.getElementById('throttle-btn');
             if(tBtn && tBtn.matches(':active')) this.throttle = 1;
         },
@@ -178,7 +185,7 @@ window.addEventListener('load', () => {
         }
     };
 
-    // F. TERRAIN GENERATION (Fixed Scoping & Safe Raycast)
+    // F. TERRAIN GENERATION
     function createTerrainManager() {
         let segments = [], lastGenX = 0;
         let lastChk = 0;
@@ -196,6 +203,7 @@ window.addEventListener('load', () => {
             points.push(Vec2(startX, lastY));
             vPoints.push(new THREE.Vector2(startX, lastY));
 
+            // [OPTIMIZATION] Loop step uses SAMPLE_DISTANCE which we increased
             for (let x = startX + TERRAIN_PARAMS.SAMPLE_DISTANCE; x <= startX + TERRAIN_PARAMS.SEGMENT_LENGTH; x += TERRAIN_PARAMS.SAMPLE_DISTANCE) {
                 let y = heightFn(x);
                 const slope = (y - lastY) / TERRAIN_PARAMS.SAMPLE_DISTANCE;
@@ -207,18 +215,17 @@ window.addEventListener('load', () => {
                 lastY = y;
             }
             
-            // 1. Physics Body
             const body = world.createBody(Vec2.zero());
             body.createFixture(pl.Chain(points, false), { friction: 0.9, userData: { type: 'ground' } });
             
-            // 2. 3D Mesh
             vPoints.push(new THREE.Vector2(vPoints[vPoints.length-1].x, -50));
             vPoints.push(new THREE.Vector2(startX, -50));
             
             const shape = new THREE.Shape(vPoints);
             const geometry = new THREE.ExtrudeGeometry(shape, {
                 depth: 20,
-                bevelEnabled: false
+                bevelEnabled: false,
+                steps: 1 // [OPTIMIZATION] Only 1 step along depth needed
             });
             geometry.translate(0, 0, -10);
 
@@ -236,7 +243,6 @@ window.addEventListener('load', () => {
             segments.push({ body, endX: startX + TERRAIN_PARAMS.SEGMENT_LENGTH });
             lastGenX = startX + TERRAIN_PARAMS.SEGMENT_LENGTH;
 
-            // 3. Generate Items
             for(let i=1; i<points.length-1; i++) {
                 if (points[i].y > points[i-1].y && points[i].y > points[i+1].y) {
                     if (points[i].x > (lastChk + GAME_PARAMS.CHECKPOINT_DISTANCE)) {
@@ -262,13 +268,12 @@ window.addEventListener('load', () => {
             getSlope(x) { 
                 let s = 0;
                 world.rayCast(Vec2(x, 50), Vec2(x, -50), (f, p, n) => { 
-                    // [FIX] Safely check user data on fixture OR body
                     const ud = f.getUserData() || f.getBody().getUserData();
                     if(ud && ud.type === 'ground') { 
                         s = -n.x/n.y; 
-                        return 0; // Stop raycast
+                        return 0; 
                     } 
-                    return -1; // Continue raycast (ignore non-ground)
+                    return -1; 
                 });
                 return s;
             }
@@ -300,7 +305,6 @@ window.addEventListener('load', () => {
     function createVehicle(pos) {
         const vp = VEHICLE_PARAMS;
 
-        // 1. Chassis
         const chassis = world.createDynamicBody({ position: pos, angularDamping: 0.1 });
         const density = vp.CHASSIS_MASS / 1.0; 
         
@@ -308,7 +312,6 @@ window.addEventListener('load', () => {
         chassis.createFixture(pl.Box(vp.FRONT_BAR_DIM.w/2, vp.FRONT_BAR_DIM.h/2, Vec2(vp.FRONT_BAR_OFFSET.x, vp.FRONT_BAR_OFFSET.y)), { density, filterGroupIndex: -1 });
         chassis.setUserData({ type: 'chassis' });
 
-        // 3D Chassis Mesh
         const chassisGroup = new THREE.Group();
         const rearMat = new THREE.MeshStandardMaterial({ color: 0x3366cc, roughness: 0.4, metalness: 0.6 });
         const rearGeo = new THREE.BoxGeometry(vp.REAR_BAR_DIM.w, vp.REAR_BAR_DIM.h, 1);
@@ -328,7 +331,6 @@ window.addEventListener('load', () => {
         scene.add(chassisGroup);
         chassis.setUserData({ mesh: chassisGroup, type: 'chassis' });
 
-        // 2. Wheels
         const makeWheel = (xOffset, label) => {
             const wheelBody = world.createDynamicBody({ position: chassis.getWorldPoint(Vec2(xOffset, -1)), angularDamping: 0.1 });
             wheelBody.createFixture(pl.Circle(vp.WHEEL_RADIUS), { density: vp.WHEEL_MASS, friction: vp.WHEEL_FRICTION, restitution: 0, filterGroupIndex: -1, userData: { type: 'wheel', wheelId: label, owner: null } });
@@ -367,7 +369,6 @@ window.addEventListener('load', () => {
                 this.front.setPosition(fPos); this.front.setLinearVelocity(Vec2(0,0)); this.front.setAngularVelocity(0);
             },
             update(dt, input) {
-                // Motor
                 if (input.throttle) {
                     this.rJoint.enableMotor(true);
                     this.rJoint.setMotorSpeed(-input.throttle * vp.MOTOR_MAX_SPEED);
@@ -376,12 +377,10 @@ window.addEventListener('load', () => {
                     this.rJoint.enableMotor(false);
                     if (this.grounded.rear > 0) this.rear.applyTorque(-this.rear.getAngularVelocity() * 10, true);
                 }
-                // Brakes
                 if (input.brake) {
                     this.rear.applyTorque(clamp(-this.rear.getAngularVelocity()*120, -vp.BRAKE_TORQUE, vp.BRAKE_TORQUE), true);
                     this.front.applyTorque(clamp(-this.front.getAngularVelocity()*120, -vp.BRAKE_TORQUE, vp.BRAKE_TORQUE), true);
                 }
-                // Air Control
                 let t = -input.pitch * vp.AIR_CONTROL_TORQUE;
                 t -= this.chassis.getAngularVelocity() * vp.AIR_CONTROL_DAMPING;
                 this.chassis.applyTorque(t, true);
@@ -398,6 +397,7 @@ window.addEventListener('load', () => {
     // H. MAIN LOOP
     let lastTime = 0, accumulator = 0;
     cameraFollow = { x: 0, y: 0 };
+    let frameCount = 0; // [OPTIMIZATION] Counter for DOM throttling
 
     function gameLoop(time) {
         requestAnimationFrame(gameLoop);
@@ -416,12 +416,14 @@ window.addEventListener('load', () => {
         }
 
         accumulator += dt;
+        // [OPTIMIZATION] Prevent Spiral of Death by capping accumulator
+        if(accumulator > 0.1) accumulator = 0.1;
+
         while (accumulator >= PHYSICS_STEP && accumulator < MAX_ACCUMULATOR_STEPS * PHYSICS_STEP) {
             vehicle.update(PHYSICS_STEP, input);
             world.step(PHYSICS_STEP);
             accumulator -= PHYSICS_STEP;
         }
-        if (accumulator > 1) accumulator = 0; 
 
         // Sync Physics -> Graphics
         for (let b = world.getBodyList(); b; b = b.getNext()) {
@@ -439,7 +441,6 @@ window.addEventListener('load', () => {
             }
         }
 
-        // Camera Follow
         const targetPos = vehicle.chassis.getPosition();
         const vel = vehicle.chassis.getLinearVelocity();
         const tx = targetPos.x + vel.x * 0.5;
@@ -460,15 +461,21 @@ window.addEventListener('load', () => {
         terrainManager.update(camera.position.x);
         if (vehicle.chassis.getPosition().y < -30) input.handleReset();
 
-        // HUD
-        document.getElementById('speed-value').textContent = (vehicle.chassis.getLinearVelocity().length() * 3.6).toFixed(0);
-        document.getElementById('rpm-value').textContent = Math.abs(vehicle.rear.getAngularVelocity() * 10).toFixed(0);
-        document.getElementById('fuel-value').textContent = gameState.fuel.toFixed(0);
-        document.getElementById('slope-value').textContent = (terrainManager.getSlope(targetPos.x)*100).toFixed(0);
-        document.getElementById('angle-value').textContent = ((vehicle.chassis.getAngle()*180/Math.PI)%360).toFixed(0);
-        document.getElementById('torque-value').textContent = vehicle.totalTorque.toFixed(0);
-        gameState.distance = Math.max(gameState.distance, targetPos.x);
-        document.getElementById('distance-value').textContent = gameState.distance.toFixed(1);
+        // [OPTIMIZATION] Throttle DOM and Raycast updates to every 10 frames
+        frameCount++;
+        if (frameCount % 10 === 0) {
+            document.getElementById('speed-value').textContent = (vehicle.chassis.getLinearVelocity().length() * 3.6).toFixed(0);
+            document.getElementById('rpm-value').textContent = Math.abs(vehicle.rear.getAngularVelocity() * 10).toFixed(0);
+            document.getElementById('fuel-value').textContent = gameState.fuel.toFixed(0);
+            
+            // Expensive calculation:
+            document.getElementById('slope-value').textContent = (terrainManager.getSlope(targetPos.x)*100).toFixed(0);
+            
+            document.getElementById('angle-value').textContent = ((vehicle.chassis.getAngle()*180/Math.PI)%360).toFixed(0);
+            document.getElementById('torque-value').textContent = vehicle.totalTorque.toFixed(0);
+            gameState.distance = Math.max(gameState.distance, targetPos.x);
+            document.getElementById('distance-value').textContent = gameState.distance.toFixed(1);
+        }
         
         if (gameState.gameOver) document.getElementById('game-over-panel').classList.remove('hidden');
 
