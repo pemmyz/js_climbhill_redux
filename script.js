@@ -19,10 +19,9 @@ window.addEventListener('load', () => {
         AIR_CONTROL_TORQUE: 1800, AIR_CONTROL_DAMPING: 30
     };
 
-    // [RESTORED] Original terrain parameters to prevent frequent generation stutter
     const TERRAIN_PARAMS = { 
         SEGMENT_LENGTH: 100, 
-        SAMPLE_DISTANCE: 1.2, // Balanced for visual quality vs performance
+        SAMPLE_DISTANCE: 1.2, 
         MAX_SLOPE: 0.8, 
         GENERATION_THRESHOLD: 200, 
         CULLING_THRESHOLD: 150, 
@@ -36,6 +35,10 @@ window.addEventListener('load', () => {
     const pl = planck, Vec2 = pl.Vec2;
     let world, vehicle, terrainManager;
     let scene, camera, renderer, sunLight;
+    
+    // Configurable state
+    let cameraZoom = 28; // Default Z distance
+
     let gameState = { paused: false, debug: false, gameOver: false, distance: 0, fuel: GAME_PARAMS.FUEL_START, lastCheckpoint: null };
 
     // C. THREE.JS SETUP
@@ -47,7 +50,8 @@ window.addEventListener('load', () => {
         scene.fog = new THREE.Fog(0x87CEEB, 20, 80);
 
         camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 5, 25);
+        // Initial position, z will be overridden by cameraZoom
+        camera.position.set(0, 5, cameraZoom);
 
         renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: "high-performance" });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -130,14 +134,44 @@ window.addEventListener('load', () => {
     const input = {
         throttle: 0, brake: 0, pitch: 0, keys: new Set(),
         init() {
+            // Panels
             const helpPanel = document.getElementById('help-panel');
-            const toggleHelp = () => helpPanel.classList.toggle('hidden');
-            const helpBtn = document.getElementById('help-toggle-button');
-            const closeBtn = document.getElementById('close-help-btn');
-            const restartBtn = document.getElementById('restart-btn');
+            const optionsPanel = document.getElementById('options-panel');
+            
+            // Toggle Logic
+            const togglePanel = (panel) => {
+                const isHidden = panel.classList.contains('hidden');
+                // Close all first
+                helpPanel.classList.add('hidden');
+                optionsPanel.classList.add('hidden');
+                // Open if it was hidden
+                if(isHidden) panel.classList.remove('hidden');
+            };
 
-            if(helpBtn) helpBtn.onclick = toggleHelp;
-            if(closeBtn) closeBtn.onclick = () => helpPanel.classList.add('hidden');
+            // Help Bindings
+            const helpBtn = document.getElementById('help-toggle-button');
+            const closeHelpBtn = document.getElementById('close-help-btn');
+            if(helpBtn) helpBtn.onclick = () => togglePanel(helpPanel);
+            if(closeHelpBtn) closeHelpBtn.onclick = () => helpPanel.classList.add('hidden');
+
+            // Options Bindings
+            const optionsBtn = document.getElementById('options-toggle-button');
+            const closeOptionsBtn = document.getElementById('close-options-btn');
+            if(optionsBtn) optionsBtn.onclick = () => togglePanel(optionsPanel);
+            if(closeOptionsBtn) closeOptionsBtn.onclick = () => optionsPanel.classList.add('hidden');
+
+            // Zoom Slider Binding
+            const zoomSlider = document.getElementById('zoom-slider');
+            const zoomDisplay = document.getElementById('zoom-display');
+            if(zoomSlider) {
+                zoomSlider.oninput = (e) => {
+                    cameraZoom = parseFloat(e.target.value);
+                    if(zoomDisplay) zoomDisplay.textContent = cameraZoom;
+                };
+            }
+
+            // General Bindings
+            const restartBtn = document.getElementById('restart-btn');
             if(restartBtn) restartBtn.onclick = () => this.handleReset();
 
             window.addEventListener('keydown', e => this.keys.add(e.code));
@@ -145,13 +179,15 @@ window.addEventListener('load', () => {
                 this.keys.delete(e.code);
                 if (e.code === 'KeyR') this.handleReset();
                 if (e.code === 'Space') gameState.paused = !gameState.paused;
-                if (e.code === 'KeyH') toggleHelp();
+                if (e.code === 'KeyH') togglePanel(helpPanel);
+                if (e.code === 'KeyO') togglePanel(optionsPanel);
                 if (e.code === 'KeyD') {
                     gameState.debug = !gameState.debug;
                     scene.traverse(o => { if(o.name === 'debug') o.visible = gameState.debug; });
                 }
             });
 
+            // Mobile Bindings
             const setupMob = (id, fn) => {
                 const b = document.getElementById(id);
                 if (!b) return;
@@ -262,7 +298,6 @@ window.addEventListener('load', () => {
         return {
             init() { generate(-TERRAIN_PARAMS.SEGMENT_LENGTH); generate(0); },
             update(camX) {
-                // Original Logic: Look ahead larger distance, delete later
                 if (camX > lastGenX - TERRAIN_PARAMS.GENERATION_THRESHOLD) generate(lastGenX);
                 if (segments.length > 0 && camX > segments[0].endX + TERRAIN_PARAMS.CULLING_THRESHOLD) {
                     removeBodyAndMesh(segments[0].body);
@@ -443,13 +478,12 @@ window.addEventListener('load', () => {
             }
         }
 
-        // Camera Update (Fixed Distance)
+        // Camera Update 
         const carPos = vehicle.chassis.getPosition();
-        
-        // FIXED OFFSET - No lerp, no smoothing, exactly matches physics body
-        camera.position.x = carPos.x + 8; // Keep car slightly to left of center
-        camera.position.y = carPos.y + 6; // Height
-        camera.position.z = 28;           // Distance
+        camera.position.x = carPos.x + 8; 
+        camera.position.y = carPos.y + 6; 
+        // Apply variable zoom here
+        camera.position.z = cameraZoom;   
         
         // Look at car
         camera.lookAt(carPos.x + 6, carPos.y, 0);
