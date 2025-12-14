@@ -12,6 +12,9 @@ in‑game HUD.
 
 ------------------------------------------------------------------------
 
+## Screenshots
+![Game 1](screenshots/game_1.png)
+
 ## ✨ Features
 a
 -   **Three.js rendering**
