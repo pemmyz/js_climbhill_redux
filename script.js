@@ -140,17 +140,25 @@ window.addEventListener('load', () => {
 
         update(dt, carPos) {
             
-            // --- BASIC MODE (Flat, No Shadows) ---
+            // Manage Headlights Visibility
+            if (vehicle && vehicle.headlights) {
+                // Only enable headlights in Modern Mode
+                const lightsOn = (SETTINGS.graphics === 'modern');
+                vehicle.headlights.forEach(l => l.visible = lightsOn);
+            }
+
+            // --- BASIC MODE (Flat, No Shadows, Even Illumination) ---
             if (SETTINGS.graphics === 'basic') {
                 renderer.shadowMap.enabled = false;
                 
-                // No directional light (shading), all Ambient
+                // No directional shading
                 this.sunLight.intensity = 0; 
                 this.sunLight.castShadow = false;
                 
+                // Global Illumination (Even White Light)
                 this.hemiLight.color.setHex(0xffffff);
                 this.hemiLight.groundColor.setHex(0xffffff);
-                this.hemiLight.intensity = 1.2; 
+                this.hemiLight.intensity = 1.0; 
 
                 scene.background = new THREE.Color(0x6495ED); 
                 scene.fog = null;
@@ -174,7 +182,7 @@ window.addEventListener('load', () => {
                 this.sunLight.target.position.set(carPos.x, 0, 0);
                 this.sunLight.target.updateMatrixWorld();
 
-                // Standard Ambient
+                // Standard Ambient (Ground is darker for contrast)
                 this.hemiLight.color.setHex(0xffffff);
                 this.hemiLight.groundColor.setHex(0x444444);
                 this.hemiLight.intensity = 0.6;
@@ -549,6 +557,7 @@ window.addEventListener('load', () => {
 
         const obj = {
             chassis, rear: rear.body, front: front.body, rJoint: rear.joint, fJoint: front.joint,
+            headlights: [lightL, lightR], // Expose headlights for environment control
             grounded: { rear: 0, front: 0 },
             setGrounded(id, val) { this.grounded[id] += val ? 1 : -1; },
             reset(pos) {
