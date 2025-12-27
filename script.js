@@ -4,7 +4,7 @@ window.addEventListener('load', () => {
 
     // --- CONFIGURATION ---
     const SETTINGS = {
-        graphics: 'modern', // 'modern' or 'classic'
+        graphics: 'modern', // 'modern', 'classic', or 'basic'
         cameraZoom: 28,
         dayCycleDuration: 120, // Seconds for a full day
     };
@@ -15,14 +15,13 @@ window.addEventListener('load', () => {
         MAX_STEPS: 5
     };
 
-    // RESTORED PHYSICS PARAMETERS
     const VEHICLE_PARAMS = {
         CHASSIS_MASS: 180,
         REAR_BAR_DIM: { w: 1.2, h: 0.25 },
         FRONT_BAR_DIM: { w: 0.8, h: 0.25 },
         FRONT_BAR_OFFSET: { x: 0.8, y: -0.05 },
         WHEEL_MASS: 12, WHEEL_RADIUS: 0.35, WHEEL_FRICTION: 1.6, WHEEL_RESTITUTION: 0.05,
-        TRACK_WIDTH: 1.5, // Distance between front and rear wheels
+        TRACK_WIDTH: 1.5,
         SUSPENSION_FREQ_HZ: 2.0, SUSPENSION_DAMPING_RATIO: 0.45, SUSPENSION_TRAVEL: 0.35,
         MOTOR_TORQUE: 900, MOTOR_MAX_SPEED: 70, BRAKE_TORQUE: 1800,
         AIR_CONTROL_TORQUE: 1800, AIR_CONTROL_DAMPING: 30
@@ -140,27 +139,71 @@ window.addEventListener('load', () => {
         }
 
         update(dt, carPos) {
-            if (SETTINGS.graphics === 'classic') {
-                this.sunLight.position.set(carPos.x + 10, 30, 10);
-                this.sunLight.intensity = 1;
-                this.hemiLight.intensity = 0.8;
-                scene.background = this.colors.daySky;
+            
+            // --- BASIC MODE (Flat, No Shadows) ---
+            if (SETTINGS.graphics === 'basic') {
+                renderer.shadowMap.enabled = false;
+                
+                // No directional light (shading), all Ambient
+                this.sunLight.intensity = 0; 
+                this.sunLight.castShadow = false;
+                
+                this.hemiLight.color.setHex(0xffffff);
+                this.hemiLight.groundColor.setHex(0xffffff);
+                this.hemiLight.intensity = 1.2; 
+
+                scene.background = new THREE.Color(0x6495ED); 
+                scene.fog = null;
+
                 this.starField.visible = false;
                 this.cloudGroup.visible = false;
                 this.moonMesh.visible = false;
-                scene.fog = null;
+                document.getElementById('time-display').innerText = "--:--";
                 return;
             }
 
-            // --- MODERN MODE ---
+            // --- CLASSIC MODE (Static Light, Shadows, No Cycle) ---
+            if (SETTINGS.graphics === 'classic') {
+                renderer.shadowMap.enabled = true;
+                this.sunLight.castShadow = true;
+                
+                // Fixed Noon Lighting
+                this.sunLight.intensity = 1.2;
+                this.sunLight.color.setHex(0xffffee);
+                this.sunLight.position.set(carPos.x + 50, 60, 20);
+                this.sunLight.target.position.set(carPos.x, 0, 0);
+                this.sunLight.target.updateMatrixWorld();
+
+                // Standard Ambient
+                this.hemiLight.color.setHex(0xffffff);
+                this.hemiLight.groundColor.setHex(0x444444);
+                this.hemiLight.intensity = 0.6;
+
+                // Simple Blue Sky + Fog
+                scene.background = this.colors.daySky;
+                scene.fog = new THREE.Fog(this.colors.daySky, 30, 90);
+
+                // Hide Extras
+                this.starField.visible = false;
+                this.cloudGroup.visible = false;
+                this.moonMesh.visible = false;
+                document.getElementById('time-display').innerText = "12:00";
+                return;
+            }
+
+            // --- MODERN MODE (Day/Night, Dynamic) ---
+            renderer.shadowMap.enabled = true;
+            this.sunLight.castShadow = true;
             this.cloudGroup.visible = true;
             this.starField.visible = true;
             this.moonMesh.visible = true;
+            this.hemiLight.groundColor.setHex(0x444444);
+            this.hemiLight.color.setHex(0xffffff);
             
             gameState.timeOfDay = (gameState.timeOfDay + dt / SETTINGS.dayCycleDuration) % 1;
             
             const t = gameState.timeOfDay;
-            const angle = (t * Math.PI * 2) + (Math.PI / 2); // Start at noon
+            const angle = (t * Math.PI * 2) + (Math.PI / 2); 
             const dist = 60;
             
             const sunX = Math.cos(angle) * dist;
@@ -192,6 +235,8 @@ window.addEventListener('load', () => {
                 skyColor.lerp(this.colors.sunsetSky, 0.5); 
                 sunInt = (t-0.7)*10;
                 starOp = 1 - (t-0.7)*10;
+            } else {
+                this.sunLight.color.setHex(0xffffee);
             }
 
             scene.background = skyColor;
@@ -332,7 +377,6 @@ window.addEventListener('load', () => {
         let lastChk = 0, lastFuel = 0;
         
         const seed = Math.random() * 1000;
-        // Restored Terrain Params from first version roughly, but keeping loop
         const A1 = 0.8, F1 = 0.4, A2 = 0.3, F2 = 1.2;
         const heightFn = x => A1 * Math.sin(F1 * x + seed) + A2 * Math.sin(F2 * x + seed + 100);
 
@@ -443,19 +487,18 @@ window.addEventListener('load', () => {
         };
     }
 
-    // --- RESTORED VEHICLE FACTORY ---
+    // --- VEHICLE FACTORY ---
     function createVehicle(pos) {
         const vp = VEHICLE_PARAMS;
 
         const chassis = world.createDynamicBody({ position: pos, angularDamping: 0.1 });
         const density = vp.CHASSIS_MASS / 1.0; 
         
-        // Exact Fixtures from previous version
         chassis.createFixture(pl.Box(vp.REAR_BAR_DIM.w/2, vp.REAR_BAR_DIM.h/2, Vec2(-0.2, 0)), { density, filterGroupIndex: -1 });
         chassis.createFixture(pl.Box(vp.FRONT_BAR_DIM.w/2, vp.FRONT_BAR_DIM.h/2, Vec2(vp.FRONT_BAR_OFFSET.x, vp.FRONT_BAR_OFFSET.y)), { density, filterGroupIndex: -1 });
         chassis.setUserData({ type: 'chassis' });
 
-        // Visuals (Updated to match Physics shape + added Headlights for Night mode)
+        // Visuals
         const chassisGroup = new THREE.Group();
         const rearMat = new THREE.MeshStandardMaterial({ color: 0x3366cc, roughness: 0.4, metalness: 0.6 });
         
@@ -472,7 +515,6 @@ window.addEventListener('load', () => {
         const cockpit = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 0.8), new THREE.MeshStandardMaterial({ color: 0x111111 }));
         cockpit.position.set(-0.2, 0.35, 0);
         
-        // Add headlights to chassis for night mode
         const lightL = new THREE.PointLight(0xffffaa, 1, 10); lightL.position.set(1.5, 0, 0.4); chassisGroup.add(lightL);
         const lightR = new THREE.PointLight(0xffffaa, 1, 10); lightR.position.set(1.5, 0, -0.4); chassisGroup.add(lightR);
 
@@ -516,7 +558,6 @@ window.addEventListener('load', () => {
                 this.rear.setPosition(rPos); this.rear.setLinearVelocity(Vec2(0,0)); this.rear.setAngularVelocity(0);
                 this.front.setPosition(fPos); this.front.setLinearVelocity(Vec2(0,0)); this.front.setAngularVelocity(0);
             },
-            // Restored complex update logic
             update(dt, input) {
                 if (input.throttle) {
                     this.rJoint.enableMotor(true);
@@ -541,44 +582,33 @@ window.addEventListener('load', () => {
         return obj;
     }
 
-
-
-// --- MAIN LOOP ---
+    // --- MAIN LOOP ---
     let lastTime = 0, accumulator = 0;
 
     function gameLoop(time) {
         requestAnimationFrame(gameLoop);
         
-        // Calculate delta time (in seconds)
         let dt = (time - lastTime) / 1000;
         lastTime = time;
 
-        // Prevent huge jumps if the tab was backgrounded
         if (dt > 0.1) dt = 0.1;
 
         if (!gameState.paused) {
             input.update();
             
-            // --- PHYSICS STEP FIX ---
             accumulator += dt;
-            
-            // CAP the accumulator to prevent "Spiral of Death"
-            // (If the game lags, we just slow down simulation slightly rather than stopping it)
             const MAX_ACCUMULATOR = PHYSICS.MAX_STEPS * PHYSICS.STEP;
             if (accumulator > MAX_ACCUMULATOR) {
                 accumulator = MAX_ACCUMULATOR;
             }
 
-            // Run physics steps as long as we have time in the accumulator
             while (accumulator >= PHYSICS.STEP) {
                 vehicle.update(PHYSICS.STEP, input);
                 world.step(PHYSICS.STEP);
                 accumulator -= PHYSICS.STEP;
             }
 
-            // Game Logic (Fuel)
             if (!gameState.gameOver && !gameState.debug) {
-                // Classic fuel drain formula
                 gameState.fuel -= (0.5 + Math.abs(input.throttle) * 2) * dt; 
                 if (gameState.fuel <= 0) { 
                     gameState.fuel = 0; 
@@ -586,7 +616,6 @@ window.addEventListener('load', () => {
                 }
             }
 
-            // Sync Physics -> Graphics
             for (let b = world.getBodyList(); b; b = b.getNext()) {
                 const ud = b.getUserData();
                 if (ud && ud.mesh) {
@@ -595,7 +624,6 @@ window.addEventListener('load', () => {
                     ud.mesh.position.set(p.x, p.y, 0);
                     ud.mesh.rotation.z = a;
                     
-                    // Floating animation for items
                     if(ud.type === 'fuel' || ud.type === 'checkpoint') {
                         ud.mesh.rotation.y += dt;
                         ud.mesh.position.y = ud.originalY + Math.sin(time/500 + ud.mesh.userData.floatOffset) * 0.2;
@@ -603,19 +631,15 @@ window.addEventListener('load', () => {
                 }
             }
             
-            // Camera Follow
             const cp = vehicle.chassis.getPosition();
-            // Smooth horizontal follow, rigid vertical (to avoid nausea on bumps)
             camera.position.x = cp.x + 8;
             camera.position.y = cp.y + 5;
             camera.position.z = SETTINGS.cameraZoom;
             camera.lookAt(cp.x + 6, cp.y, 0);
 
-            // Update Terrain & Environment
             terrainManager.update(cp.x);
             environment.update(dt, cp);
 
-            // Update HUD
             if(Math.floor(time) % 10 === 0) {
                 document.getElementById('speed-value').innerText = Math.floor(vehicle.chassis.getLinearVelocity().length() * 3.6);
                 document.getElementById('fuel-value').innerText = Math.floor(gameState.fuel);
