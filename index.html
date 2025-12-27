@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Planck Racer 2.5D - Redux</title>
+    <title>Planck Racer - Day/Night Edition</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚙</text></svg>">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -14,23 +14,14 @@
 
     <div id="hud">
         <div class="hud-item">Speed: <span id="speed-value">0</span> km/h</div>
-        <div class="hud-item">RPM: <span id="rpm-value">0</span></div>
         <div class="hud-item">Fuel: <span id="fuel-value">100</span>%</div>
         <div class="hud-item">Distance: <span id="distance-value">0</span> m</div>
-        <div class="hud-item">Slope: <span id="slope-value">0</span>%</div>
-        <div class="hud-item">Angle: <span id="angle-value">0</span>°</div>
-        <div class="hud-item">Torque: <span id="torque-value">0</span></div>
+        <div class="hud-item">Time: <span id="time-display">12:00</span></div>
     </div>
 
     <!-- Help Panel -->
     <div id="help-panel" class="overlay-panel hidden">
-        <h2>🚙 Planck Racer 2.5D</h2>
-        <h3>✨ Features</h3>
-        <ul>
-            <li><b>Three.js Rendering</b> with dynamic shadows.</li>
-            <li><b>Planck.js physics</b> (120Hz simulation).</li>
-            <li><b>Procedural terrain</b> generation.</li>
-        </ul>
+        <h2>🚙 Planck Racer HD</h2>
         <h3>🎮 Controls</h3>
         <table>
             <thead><tr><th>Action</th><th>Keyboard</th><th>Mobile</th></tr></thead>
@@ -39,22 +30,30 @@
                 <tr><td>Brake</td><td>↓</td><td><b>Brake</b></td></tr>
                 <tr><td>Pitch (Air)</td><td>← / →</td><td>◄ / ►</td></tr>
                 <tr><td>Reset</td><td>R</td><td>—</td></tr>
-                <tr><td>Pause</td><td>Space</td><td>—</td></tr>
                 <tr><td>Debug</td><td>D</td><td>—</td></tr>
             </tbody>
         </table>
         <button id="close-help-btn">Close</button>
     </div>
 
-    <!-- Options Panel (New) -->
+    <!-- Options Panel -->
     <div id="options-panel" class="overlay-panel hidden">
         <h2>⚙️ Options</h2>
+        
         <div class="option-group">
-            <label for="zoom-slider">Camera Zoom (Distance)</label>
-            <input type="range" id="zoom-slider" min="15" max="60" value="28" step="0.5">
-            <div class="slider-value">Value: <span id="zoom-display">28</span></div>
+            <label for="graphics-select">Graphics Mode</label>
+            <select id="graphics-select">
+                <option value="modern">Modern (Grass, Shadows, Day/Night)</option>
+                <option value="classic">Classic (Performance, Static Light)</option>
+            </select>
         </div>
-        <p class="small-note">Adjusts camera Z-depth instantly.</p>
+
+        <div class="option-group">
+            <label for="zoom-slider">Camera Distance</label>
+            <input type="range" id="zoom-slider" min="15" max="60" value="28" step="0.5">
+            <div class="slider-value"><span id="zoom-display">28</span></div>
+        </div>
+        
         <button id="close-options-btn">Close</button>
     </div>
     
@@ -74,20 +73,16 @@
     <div id="game-over-panel" class="overlay-panel hidden">
         <h2>GAME OVER</h2>
         <p>Out of fuel!</p>
-        <p>Press 'R' to restart.</p>
         <button id="restart-btn">Restart</button>
     </div>
 
-    <!-- Buttons Container -->
     <div id="bottom-ui-bar">
         <button id="help-toggle-button">Help (H)</button>
         <button id="options-toggle-button">Options (O)</button>
     </div>
 
-    <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/planck@latest/dist/planck.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Main Game Logic -->
     <script src="script.js"></script>
 </body>
 </html>

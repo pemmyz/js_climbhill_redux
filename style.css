@@ -20,33 +20,34 @@ canvas { display: block; width: 100%; height: 100%; outline: none; }
     pointer-events: none; z-index: 10;
 }
 
-/* Common Panel Styles */
 .overlay-panel {
     position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
     background-color: rgba(20, 20, 30, 0.95); padding: 25px;
     border: 1px solid var(--primary-text); border-radius: 8px;
     z-index: 100; text-align: left; line-height: 1.6;
-    max-width: min(700px, 90vw); max-height: 90vh; overflow-y: auto;
-    box-shadow: 0 0 20px rgba(0,0,0,0.5);
-    min-width: 300px;
+    max-width: min(700px, 90vw); box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    min-width: 320px;
 }
 .overlay-panel.hidden { display: none; }
-.overlay-panel h2, .overlay-panel h3 { text-align: center; margin-top: 1em; margin-bottom: 0.5em; color: var(--accent);}
-.overlay-panel h2:first-child { margin-top: 0; }
-.overlay-panel ul { list-style-position: inside; padding-left: 10px; }
-.overlay-panel table { width: 100%; border-collapse: collapse; margin: 1em 0; }
-.overlay-panel th, .overlay-panel td { border: 1px solid #555; padding: 8px; text-align: left; }
-.overlay-panel th { background-color: rgba(255,255,255,0.1); }
+.overlay-panel h2 { text-align: center; margin: 0 0 15px 0; color: var(--accent); }
 .overlay-panel button { display: block; margin: 20px auto 0; padding: 10px 20px; background: var(--btn-bg); color: var(--primary-text); border: 1px solid var(--primary-text); border-radius: 5px; cursor: pointer; }
 .overlay-panel button:hover { background: var(--btn-active-bg); }
 
-/* Option Slider Specifics */
+/* Option Controls */
 .option-group { margin: 20px 0; text-align: center; }
-.option-group label { display: block; margin-bottom: 10px; font-weight: bold; color: var(--accent); }
-.option-group input[type=range] { width: 100%; cursor: pointer; margin-bottom: 5px; }
-.slider-value { font-size: 12px; color: #aaa; }
-.small-note { font-size: 11px; color: #888; text-align: center; font-style: italic; }
+.option-group label { display: block; margin-bottom: 8px; font-weight: bold; color: var(--accent); }
+.option-group select { 
+    width: 100%; padding: 8px; background: #333; color: white; border: 1px solid #666; border-radius: 4px; 
+}
+.option-group input[type=range] { width: 100%; cursor: pointer; }
+.slider-value { font-size: 12px; color: #aaa; margin-top: 5px; }
 
+/* Table */
+.overlay-panel table { width: 100%; border-collapse: collapse; }
+.overlay-panel th, .overlay-panel td { border: 1px solid #555; padding: 8px; }
+.overlay-panel th { background-color: rgba(255,255,255,0.1); }
+
+/* Mobile */
 #mobile-controls {
     position: fixed; bottom: 20px; left: 0; right: 0;
     width: 100%; height: 120px; display: none;
@@ -62,8 +63,6 @@ canvas { display: block; width: 100%; height: 100%; outline: none; }
     user-select: none; -webkit-tap-highlight-color: transparent;
 }
 .mobile-btn:active { background-color: var(--btn-active-bg); transform: scale(0.95); }
-
-/* Bottom UI Bar */
 #bottom-ui-bar {
     position: fixed; bottom: 10px; left: 10px;
     z-index: 50; display: flex; gap: 10px;
@@ -72,11 +71,9 @@ canvas { display: block; width: 100%; height: 100%; outline: none; }
     background-color: var(--hud-bg); padding: 8px 12px;
     border: 1px solid #444; color: var(--primary-text);
     border-radius: 5px; font-size: 14px; cursor: pointer;
-    transition: background-color 0.2s;
 }
-#bottom-ui-bar button:hover { background-color: rgba(0, 0, 0, 0.8); border-color: var(--accent); }
 
 @media (hover: none) and (pointer: coarse), (max-width: 768px) {
     #mobile-controls { display: flex; }
-    #bottom-ui-bar { display: none; } /* Hide generic buttons on mobile to clear screen */
+    #bottom-ui-bar { display: none; } 
 }
