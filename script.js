@@ -151,14 +151,19 @@ window.addEventListener('load', () => {
             if (SETTINGS.graphics === 'basic') {
                 renderer.shadowMap.enabled = false;
                 
-                // No directional shading
-                this.sunLight.intensity = 0; 
+                // ENABLE Directional Light but DISABLE Shadow Casting
+                // We need the directional light to create "shading" on the terrain slopes.
+                // Without this, the hills look like a solid flat color block.
+                this.sunLight.intensity = 0.8; 
                 this.sunLight.castShadow = false;
+                this.sunLight.position.set(carPos.x + 20, 50, 30);
+                this.sunLight.target.position.set(carPos.x, 0, 0);
+                this.sunLight.target.updateMatrixWorld();
                 
-                // Global Illumination (Even White Light)
+                // High Global Illumination to keep it bright and "even"
                 this.hemiLight.color.setHex(0xffffff);
-                this.hemiLight.groundColor.setHex(0xffffff);
-                this.hemiLight.intensity = 1.0; 
+                this.hemiLight.groundColor.setHex(0xaaaaaa); // Slight contrast for depth
+                this.hemiLight.intensity = 0.8; 
 
                 scene.background = new THREE.Color(0x6495ED); 
                 scene.fog = null;
