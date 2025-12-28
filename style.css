@@ -27,20 +27,24 @@ canvas { display: block; width: 100%; height: 100%; outline: none; }
     z-index: 100; text-align: left; line-height: 1.6;
     max-width: min(700px, 90vw); box-shadow: 0 0 20px rgba(0,0,0,0.5);
     min-width: 320px;
+    max-height: 90vh;
+    overflow-y: auto;
 }
 .overlay-panel.hidden { display: none; }
 .overlay-panel h2 { text-align: center; margin: 0 0 15px 0; color: var(--accent); }
+.overlay-panel h3 { color: #aaa; border-bottom: 1px solid #444; margin-bottom: 10px; padding-bottom: 5px; font-size: 1.1em;}
 .overlay-panel button { display: block; margin: 20px auto 0; padding: 10px 20px; background: var(--btn-bg); color: var(--primary-text); border: 1px solid var(--primary-text); border-radius: 5px; cursor: pointer; }
 .overlay-panel button:hover { background: var(--btn-active-bg); }
 
 /* Option Controls */
-.option-group { margin: 20px 0; text-align: center; }
-.option-group label { display: block; margin-bottom: 8px; font-weight: bold; color: var(--accent); }
+.option-section { margin-bottom: 15px; }
+.option-group { margin: 10px 0; }
+.option-group label { display: block; margin-bottom: 5px; font-weight: bold; color: var(--accent); font-size: 0.9em; }
 .option-group select { 
     width: 100%; padding: 8px; background: #333; color: white; border: 1px solid #666; border-radius: 4px; 
 }
 .option-group input[type=range] { width: 100%; cursor: pointer; }
-.slider-value { font-size: 12px; color: #aaa; margin-top: 5px; }
+.slider-note { font-size: 10px; color: #888; font-style: italic; margin-top: -2px; }
 
 /* Table */
 .overlay-panel table { width: 100%; border-collapse: collapse; }

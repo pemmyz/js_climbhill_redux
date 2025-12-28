@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Planck Racer - Tri-Mode Edition</title>
+    <title>Planck Racer - Physics Edition</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚙</text></svg>">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -17,6 +17,7 @@
         <div class="hud-item">Fuel: <span id="fuel-value">100</span>%</div>
         <div class="hud-item">Distance: <span id="distance-value">0</span> m</div>
         <div class="hud-item">Time: <span id="time-display">12:00</span></div>
+        <div class="hud-item" style="font-size: 10px; color: #aaa; margin-top:5px;">Phys: <span id="phys-debug">60Hz</span></div>
     </div>
 
     <!-- Help Panel -->
@@ -40,19 +41,49 @@
     <div id="options-panel" class="overlay-panel hidden">
         <h2>⚙️ Options</h2>
         
-        <div class="option-group">
-            <label for="graphics-select">Graphics Mode</label>
-            <select id="graphics-select">
-                <option value="modern">Modern (Day/Night, Dynamic Lights)</option>
-                <option value="classic">Classic (Static Light, Shadows)</option>
-                <option value="basic">Basic (No Shadows, High Vis)</option>
-            </select>
+        <!-- Graphics Section -->
+        <div class="option-section">
+            <h3>Visuals</h3>
+            <div class="option-group">
+                <label for="graphics-select">Graphics Mode</label>
+                <select id="graphics-select">
+                    <option value="modern">Modern (Dynamic Lights)</option>
+                    <option value="classic">Classic (Static Shadows)</option>
+                    <option value="basic">Basic (No Shadows/Fast)</option>
+                </select>
+            </div>
+            <div class="option-group">
+                <label for="zoom-slider">Camera Distance: <span id="zoom-display">28</span></label>
+                <input type="range" id="zoom-slider" min="15" max="60" value="28" step="0.5">
+            </div>
         </div>
 
-        <div class="option-group">
-            <label for="zoom-slider">Camera Distance</label>
-            <input type="range" id="zoom-slider" min="15" max="60" value="28" step="0.5">
-            <div class="slider-value"><span id="zoom-display">28</span></div>
+        <hr style="border-color: #444; opacity: 0.5;">
+
+        <!-- Physics Section -->
+        <div class="option-section">
+            <h3>Physics Engine</h3>
+            <div class="option-group">
+                <label for="physics-mode-select">Physics Preset</label>
+                <select id="physics-mode-select">
+                    <option value="modern">Modern (Precise - 60Hz/High)</option>
+                    <option value="classic">Classic (Standard - 60Hz/Med)</option>
+                    <option value="basic">Basic (Fast/Loose - 30Hz/Low)</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+
+            <div class="option-group">
+                <label for="phys-hz-slider">Update Freq: <span id="phys-hz-display">60</span> Hz</label>
+                <input type="range" id="phys-hz-slider" min="30" max="120" value="60" step="10">
+                <div class="slider-note">Lower = Faster CPU, Spongy</div>
+            </div>
+
+            <div class="option-group">
+                <label for="phys-iter-slider">Solver Precision: <span id="phys-iter-display">8</span></label>
+                <input type="range" id="phys-iter-slider" min="1" max="20" value="8" step="1">
+                <div class="slider-note">Lower = Less Lag, Unstable Joints</div>
+            </div>
         </div>
         
         <button id="close-options-btn">Close</button>

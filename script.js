@@ -6,13 +6,25 @@ window.addEventListener('load', () => {
     const SETTINGS = {
         graphics: 'modern', // 'modern', 'classic', or 'basic'
         cameraZoom: 28,
-        dayCycleDuration: 120, // Seconds for a full day
+        dayCycleDuration: 120,
+        
+        // Physics Settings
+        physicsMode: 'modern',
+        physicsHz: 60,       // Frequency (Steps per second)
+        physicsIter: 8,      // Solver iterations (Precision)
     };
 
-    const PHYSICS = {
-        STEP: 1 / 60,
+    // Physics constants used for clamping
+    const PHYS_CONST = {
         GRAVITY: -10,
-        MAX_STEPS: 5
+        MAX_FRAME_TIME: 0.1 // Prevent spiral of death on lag
+    };
+
+    // Presets for Physics Modes
+    const PHYSICS_PRESETS = {
+        modern: { hz: 60, iter: 8 },  // High precision, standard speed
+        classic: { hz: 60, iter: 4 }, // Standard speed, less calculation
+        basic: { hz: 30, iter: 2 }    // Fast calculation, loose/bouncy physics
     };
 
     const VEHICLE_PARAMS = {
@@ -62,13 +74,12 @@ window.addEventListener('load', () => {
         });
     }
 
-    // --- ENVIRONMENT SYSTEM (Day/Night, Weather) ---
+    // --- ENVIRONMENT SYSTEM ---
     class Environment {
         constructor() {
             this.container = new THREE.Group();
             scene.add(this.container);
 
-            // 1. Lights
             this.hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
             this.container.add(this.hemiLight);
 
@@ -83,7 +94,6 @@ window.addEventListener('load', () => {
             this.sunLight.shadow.camera.top = d; this.sunLight.shadow.camera.bottom = -d;
             this.container.add(this.sunLight);
             
-            // 2. Celestial Bodies (Visuals)
             this.starField = this.createStars();
             this.container.add(this.starField);
             
@@ -93,13 +103,11 @@ window.addEventListener('load', () => {
             );
             this.container.add(this.moonMesh);
 
-            // 3. Clouds
             this.clouds = [];
             this.cloudGroup = new THREE.Group();
             this.createClouds();
             this.container.add(this.cloudGroup);
 
-            // Colors
             this.colors = {
                 daySky: new THREE.Color(0x87CEEB),
                 noonSky: new THREE.Color(0x4CA1E3),
@@ -140,29 +148,21 @@ window.addEventListener('load', () => {
 
         update(dt, carPos) {
             
-            // Manage Headlights Visibility
             if (vehicle && vehicle.headlights) {
-                // Only enable headlights in Modern Mode
                 const lightsOn = (SETTINGS.graphics === 'modern');
                 vehicle.headlights.forEach(l => l.visible = lightsOn);
             }
 
-            // --- BASIC MODE (Flat, No Shadows, Even Illumination) ---
             if (SETTINGS.graphics === 'basic') {
                 renderer.shadowMap.enabled = false;
-                
-                // ENABLE Directional Light but DISABLE Shadow Casting
-                // We need the directional light to create "shading" on the terrain slopes.
-                // Without this, the hills look like a solid flat color block.
                 this.sunLight.intensity = 0.8; 
                 this.sunLight.castShadow = false;
                 this.sunLight.position.set(carPos.x + 20, 50, 30);
                 this.sunLight.target.position.set(carPos.x, 0, 0);
                 this.sunLight.target.updateMatrixWorld();
                 
-                // High Global Illumination to keep it bright and "even"
                 this.hemiLight.color.setHex(0xffffff);
-                this.hemiLight.groundColor.setHex(0xaaaaaa); // Slight contrast for depth
+                this.hemiLight.groundColor.setHex(0xaaaaaa); 
                 this.hemiLight.intensity = 0.8; 
 
                 scene.background = new THREE.Color(0x6495ED); 
@@ -175,28 +175,23 @@ window.addEventListener('load', () => {
                 return;
             }
 
-            // --- CLASSIC MODE (Static Light, Shadows, No Cycle) ---
             if (SETTINGS.graphics === 'classic') {
                 renderer.shadowMap.enabled = true;
                 this.sunLight.castShadow = true;
                 
-                // Fixed Noon Lighting
                 this.sunLight.intensity = 1.2;
                 this.sunLight.color.setHex(0xffffee);
                 this.sunLight.position.set(carPos.x + 50, 60, 20);
                 this.sunLight.target.position.set(carPos.x, 0, 0);
                 this.sunLight.target.updateMatrixWorld();
 
-                // Standard Ambient (Ground is darker for contrast)
                 this.hemiLight.color.setHex(0xffffff);
                 this.hemiLight.groundColor.setHex(0x444444);
                 this.hemiLight.intensity = 0.6;
 
-                // Simple Blue Sky + Fog
                 scene.background = this.colors.daySky;
                 scene.fog = new THREE.Fog(this.colors.daySky, 30, 90);
 
-                // Hide Extras
                 this.starField.visible = false;
                 this.cloudGroup.visible = false;
                 this.moonMesh.visible = false;
@@ -204,7 +199,7 @@ window.addEventListener('load', () => {
                 return;
             }
 
-            // --- MODERN MODE (Day/Night, Dynamic) ---
+            // Modern Mode
             renderer.shadowMap.enabled = true;
             this.sunLight.castShadow = true;
             this.cloudGroup.visible = true;
@@ -233,18 +228,18 @@ window.addEventListener('load', () => {
             let sunInt = 1.2;
             let starOp = 0;
 
-            if (t > 0.2 && t < 0.3) { // Sunset
+            if (t > 0.2 && t < 0.3) { 
                 const k = (t - 0.2) * 10;
                 skyColor.lerp(this.colors.sunsetSky, k < 0.5 ? k*2 : (1-k)*2);
                 this.sunLight.color.lerp(this.colors.sunsetSun, k);
                 sunInt = 1.2 - k;
-            } else if (t >= 0.3 && t < 0.7) { // Night
+            } else if (t >= 0.3 && t < 0.7) { 
                 skyColor = this.colors.nightSky;
                 sunInt = 0; 
                 starOp = 1;
                 this.sunLight.color.setHex(0xaaaaaa);
                 if(t > 0.35 && t < 0.65) sunInt = 0.2; 
-            } else if (t >= 0.7 && t < 0.8) { // Sunrise
+            } else if (t >= 0.7 && t < 0.8) { 
                 skyColor.lerp(this.colors.sunsetSky, 0.5); 
                 sunInt = (t-0.7)*10;
                 starOp = 1 - (t-0.7)*10;
@@ -275,7 +270,7 @@ window.addEventListener('load', () => {
 
     // --- PHYSICS SETUP ---
     function initPhysics() {
-        world = pl.World({ gravity: Vec2(0, PHYSICS.GRAVITY) });
+        world = pl.World({ gravity: Vec2(0, PHYS_CONST.GRAVITY) });
         world.on('begin-contact', (c) => handleContact(c, true));
         world.on('end-contact', (c) => handleContact(c, false));
     }
@@ -313,7 +308,7 @@ window.addEventListener('load', () => {
         world.destroyBody(body);
     }
 
-    // --- INPUT ---
+    // --- INPUT & UI ---
     const input = {
         throttle: 0, brake: 0, pitch: 0, keys: new Set(),
         init() {
@@ -333,6 +328,7 @@ window.addEventListener('load', () => {
             document.getElementById('close-options-btn').onclick = () => toggle(null);
             document.getElementById('restart-btn').onclick = () => this.handleReset();
 
+            // Graphics Handlers
             document.getElementById('graphics-select').addEventListener('change', (e) => {
                 SETTINGS.graphics = e.target.value;
                 terrainManager.refreshGraphics();
@@ -343,6 +339,41 @@ window.addEventListener('load', () => {
                 SETTINGS.cameraZoom = parseFloat(e.target.value);
                 document.getElementById('zoom-display').innerText = SETTINGS.cameraZoom;
             };
+
+            // Physics Handlers
+            const physModeSelect = document.getElementById('physics-mode-select');
+            const hzSlider = document.getElementById('phys-hz-slider');
+            const iterSlider = document.getElementById('phys-iter-slider');
+            const hzDisp = document.getElementById('phys-hz-display');
+            const iterDisp = document.getElementById('phys-iter-display');
+
+            const applyPhysPreset = (mode) => {
+                if(mode === 'custom') return;
+                const p = PHYSICS_PRESETS[mode];
+                SETTINGS.physicsHz = p.hz;
+                SETTINGS.physicsIter = p.iter;
+                
+                // Update UI sliders
+                hzSlider.value = p.hz;
+                iterSlider.value = p.iter;
+                hzDisp.innerText = p.hz;
+                iterDisp.innerText = p.iter;
+            };
+
+            physModeSelect.addEventListener('change', (e) => {
+                applyPhysPreset(e.target.value);
+            });
+
+            const onManualPhysChange = () => {
+                physModeSelect.value = 'custom';
+                SETTINGS.physicsHz = parseInt(hzSlider.value);
+                SETTINGS.physicsIter = parseInt(iterSlider.value);
+                hzDisp.innerText = SETTINGS.physicsHz;
+                iterDisp.innerText = SETTINGS.physicsIter;
+            };
+
+            hzSlider.addEventListener('input', onManualPhysChange);
+            iterSlider.addEventListener('input', onManualPhysChange);
 
             window.addEventListener('keydown', e => this.keys.add(e.code));
             window.addEventListener('keyup', e => {
@@ -605,22 +636,34 @@ window.addEventListener('load', () => {
         let dt = (time - lastTime) / 1000;
         lastTime = time;
 
-        if (dt > 0.1) dt = 0.1;
+        if (dt > PHYS_CONST.MAX_FRAME_TIME) dt = PHYS_CONST.MAX_FRAME_TIME;
 
         if (!gameState.paused) {
             input.update();
             
+            // Dynamic Physics Steps
+            // Higher Hz = smaller step size (more steps per second)
+            // Lower Hz = larger step size (less precision, faster calc)
+            const physicsStepSize = 1 / SETTINGS.physicsHz;
+            
             accumulator += dt;
-            const MAX_ACCUMULATOR = PHYSICS.MAX_STEPS * PHYSICS.STEP;
-            if (accumulator > MAX_ACCUMULATOR) {
-                accumulator = MAX_ACCUMULATOR;
-            }
+            
+            // Limit loops to prevent spiral of death
+            const maxSteps = 5; 
+            let steps = 0;
 
-            while (accumulator >= PHYSICS.STEP) {
-                vehicle.update(PHYSICS.STEP, input);
-                world.step(PHYSICS.STEP);
-                accumulator -= PHYSICS.STEP;
+            while (accumulator >= physicsStepSize && steps < maxSteps) {
+                vehicle.update(physicsStepSize, input);
+                
+                // world.step(timeStep, velocityIterations, positionIterations)
+                // We pass the dynamic iterations from settings here
+                world.step(physicsStepSize, SETTINGS.physicsIter, SETTINGS.physicsIter);
+                
+                accumulator -= physicsStepSize;
+                steps++;
             }
+            // Discard excess accumulator to prevent buildup on slow frames
+            if(accumulator > physicsStepSize) accumulator = 0;
 
             if (!gameState.gameOver && !gameState.debug) {
                 gameState.fuel -= (0.5 + Math.abs(input.throttle) * 2) * dt; 
@@ -630,6 +673,7 @@ window.addEventListener('load', () => {
                 }
             }
 
+            // Sync visual mesh with physics body
             for (let b = world.getBodyList(); b; b = b.getNext()) {
                 const ud = b.getUserData();
                 if (ud && ud.mesh) {
@@ -659,6 +703,8 @@ window.addEventListener('load', () => {
                 document.getElementById('fuel-value').innerText = Math.floor(gameState.fuel);
                 gameState.distance = Math.max(gameState.distance, cp.x);
                 document.getElementById('distance-value').innerText = Math.floor(gameState.distance);
+                document.getElementById('phys-debug').innerText = `${SETTINGS.physicsHz}Hz/${SETTINGS.physicsIter}it`;
+                
                 if (gameState.gameOver) document.getElementById('game-over-panel').classList.remove('hidden');
             }
         }
