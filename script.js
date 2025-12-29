@@ -553,30 +553,36 @@ window.addEventListener('load', () => {
         // --- Visuals (Red Car with Wheel Wells) ---
         const chassisGroup = new THREE.Group();
         
-        // Create the profile of the car
+
+
+// ... inside createVehicle function ...
+
+        // Create the profile of the car (Low Poly Version)
         const carShape = new THREE.Shape();
-        const rwX = -vp.TRACK_WIDTH/2; // Rear wheel X
-        const fwX = vp.TRACK_WIDTH/2;  // Front wheel X
-        const wellRadius = vp.WHEEL_RADIUS + 0.1; 
+        const rwX = -vp.TRACK_WIDTH/2; 
+        const fwX = vp.TRACK_WIDTH/2;  
         
         // Start bottom rear bumper
         carShape.moveTo(-1.3, -0.3); 
         
-        // Rear Wheel Well (Arc)
-        // Note: In visual space, wheels are around y = -1.0 relative to chassis center
-        // So we draw the arc around y = -1.0
-        carShape.lineTo(rwX - wellRadius, -0.3);
-        carShape.absarc(rwX, -1.0, wellRadius, Math.PI - 0.5, 0.5, true); 
+        // Rear Wheel Well (Low Poly: 3 straight lines instead of smooth arc)
+        carShape.lineTo(rwX - 0.55, -0.3); 
+        carShape.lineTo(rwX - 0.35, -0.05); // Angle Up
+        carShape.lineTo(rwX + 0.35, -0.05); // Flat Top
+        carShape.lineTo(rwX + 0.55, -0.3);  // Angle Down
         
-        // Side skirt between wheels
-        carShape.lineTo(fwX - wellRadius, -0.3);
+        // Side skirt
+        carShape.lineTo(fwX - 0.55, -0.3);
         
-        // Front Wheel Well (Arc)
-        carShape.absarc(fwX, -1.0, wellRadius, Math.PI - 0.5, 0.5, true); 
+        // Front Wheel Well (Low Poly)
+        carShape.lineTo(fwX - 0.55, -0.3);
+        carShape.lineTo(fwX - 0.35, -0.05);
+        carShape.lineTo(fwX + 0.35, -0.05);
+        carShape.lineTo(fwX + 0.55, -0.3);
         
         // Front bumper
         carShape.lineTo(1.4, -0.3);
-        carShape.lineTo(1.4, 0.1); // Front grill height
+        carShape.lineTo(1.4, 0.1); 
         
         // Hood
         carShape.lineTo(0.7, 0.25);
@@ -591,16 +597,22 @@ window.addEventListener('load', () => {
         // Back down
         carShape.lineTo(-1.3, -0.3);
 
+        // Low Poly Extrusion Settings
         const extrudeSettings = { 
             depth: 1.0, 
             bevelEnabled: true, 
-            bevelSegments: 2, 
-            steps: 2, 
+            bevelSegments: 0, // 0 = Hard edges (Low Poly)
+            steps: 1,         // 1 = No extra geometry along the length
             bevelSize: 0.05, 
             bevelThickness: 0.05 
         };
 
         const carGeo = new THREE.ExtrudeGeometry(carShape, extrudeSettings);
+        // ... rest of createVehicle ...
+
+
+
+
         // Center the geometry on the Z axis
         carGeo.translate(0, 0, -0.5);
 
