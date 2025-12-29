@@ -28,8 +28,7 @@ window.addEventListener('load', () => {
     const VEHICLE_PARAMS = {
         CHASSIS_MASS: 180,
         WHEEL_MASS: 12, WHEEL_RADIUS: 0.35, WHEEL_FRICTION: 1.6, WHEEL_RESTITUTION: 0.05,
-        // Using 1.8 to keep wheels "apart" but fitting inside the original body
-        TRACK_WIDTH: 1.8,
+        TRACK_WIDTH: 1.7,
         SUSPENSION_FREQ_HZ: 2.0, SUSPENSION_DAMPING_RATIO: 0.45, SUSPENSION_TRAVEL: 0.35,
         MOTOR_TORQUE: 900, MOTOR_MAX_SPEED: 70, BRAKE_TORQUE: 1800,
         AIR_CONTROL_TORQUE: 1800, AIR_CONTROL_DAMPING: 30
@@ -318,11 +317,24 @@ window.addEventListener('load', () => {
                 if(id) panels[id].classList.remove('hidden');
             };
 
+            let wheelbaseDirty = false;
+
             document.getElementById('help-toggle-button').onclick = () => toggle('help');
             document.getElementById('options-toggle-button').onclick = () => toggle('options');
             document.getElementById('close-help-btn').onclick = () => toggle(null);
-            document.getElementById('close-options-btn').onclick = () => toggle(null);
             document.getElementById('restart-btn').onclick = () => this.handleReset();
+
+            const closeOptions = () => {
+                if(wheelbaseDirty && vehicle) {
+                    const pos = vehicle.chassis.getPosition();
+                    // Lift 5 meters (approx 4 car heights)
+                    vehicle.reset(Vec2(pos.x, pos.y + 5));
+                    wheelbaseDirty = false;
+                }
+                toggle(null);
+            };
+
+            document.getElementById('close-options-btn').onclick = closeOptions;
 
             document.getElementById('graphics-select').addEventListener('change', (e) => {
                 SETTINGS.graphics = e.target.value;
@@ -335,8 +347,11 @@ window.addEventListener('load', () => {
                 document.getElementById('zoom-display').innerText = SETTINGS.cameraZoom;
             };
 
+            // Physics Handlers
             const physModeSelect = document.getElementById('physics-mode-select');
             const suspSelect = document.getElementById('suspension-select');
+            const widthSlider = document.getElementById('track-width-slider');
+            const widthDisp = document.getElementById('track-width-display');
             const hzSlider = document.getElementById('phys-hz-slider');
             const iterSlider = document.getElementById('phys-iter-slider');
             const hzDisp = document.getElementById('phys-hz-display');
@@ -344,6 +359,31 @@ window.addEventListener('load', () => {
 
             suspSelect.addEventListener('change', (e) => {
                 SETTINGS.suspension = e.target.value;
+            });
+
+            // Handle Wheelbase Slider
+            widthSlider.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                widthDisp.innerText = val.toFixed(1);
+                VEHICLE_PARAMS.TRACK_WIDTH = val;
+                wheelbaseDirty = true;
+
+                if (vehicle) {
+                    const pos = vehicle.chassis.getPosition().clone();
+                    const linVel = vehicle.chassis.getLinearVelocity().clone();
+                    const angle = vehicle.chassis.getAngle(); 
+                    const angVel = vehicle.chassis.getAngularVelocity();
+
+                    vehicle.destroy();
+
+                    vehicle = createVehicle(pos.clone().add(Vec2(0, 0.1)), angle);
+                    
+                    vehicle.chassis.setLinearVelocity(linVel);
+                    vehicle.chassis.setAngularVelocity(angVel);
+                    
+                    vehicle.rear.setLinearVelocity(linVel);
+                    vehicle.front.setLinearVelocity(linVel);
+                }
             });
 
             const applyPhysPreset = (mode) => {
@@ -380,7 +420,13 @@ window.addEventListener('load', () => {
                 if (e.code === 'Space') gameState.paused = !gameState.paused;
                 if (e.code === 'KeyD') { gameState.debug = !gameState.debug; }
                 if (e.code === 'KeyH') toggle('help');
-                if (e.code === 'KeyO') toggle('options');
+                if (e.code === 'KeyO') {
+                    if(!panels.options.classList.contains('hidden')) {
+                        closeOptions();
+                    } else {
+                        toggle('options');
+                    }
+                }
             });
 
             const touchBtn = (id, setter) => {
@@ -529,13 +575,13 @@ window.addEventListener('load', () => {
     }
 
     // --- VEHICLE FACTORY ---
-    function createVehicle(pos) {
+    function createVehicle(pos, angle = 0) {
         const vp = VEHICLE_PARAMS;
 
         const chassis = world.createDynamicBody({ position: pos, angularDamping: 0.1 });
         const density = vp.CHASSIS_MASS / 3.0; 
         
-        // REVERTED to Original Compact Body Dimensions
+        // Original Compact Body Dimensions
         const vertices = [
             Vec2(-1.2, -0.3), // Rear Bumper Bottom
             Vec2(1.3, -0.3),  // Front Bumper Bottom
@@ -548,31 +594,34 @@ window.addEventListener('load', () => {
         chassis.createFixture(pl.Polygon(vertices), { density, filterGroupIndex: -1 });
         chassis.setUserData({ type: 'chassis' });
 
+        // IMPORTANT: Set angle immediately before creating wheels so calculating world points works correctly
+        chassis.setAngle(angle);
+
         // --- Visuals (Red Car with Wheel Wells) ---
         const chassisGroup = new THREE.Group();
 
-        // REVERTED to Original Compact Shape
         const carShape = new THREE.Shape();
-        const rwX = -vp.TRACK_WIDTH/2; 
-        const fwX = vp.TRACK_WIDTH/2;  
+        // Visuals always drawn with standard track width to keep body consistent
+        const drawRW = -1.7/2; 
+        const drawFW = 1.7/2;  
         
         // Start bottom rear bumper
         carShape.moveTo(-1.3, -0.3); 
         
         // Rear Wheel Well
-        carShape.lineTo(rwX - 0.55, -0.3); 
-        carShape.lineTo(rwX - 0.35, -0.05); // Angle Up
-        carShape.lineTo(rwX + 0.35, -0.05); // Flat Top
-        carShape.lineTo(rwX + 0.55, -0.3);  // Angle Down
+        carShape.lineTo(drawRW - 0.55, -0.3); 
+        carShape.lineTo(drawRW - 0.35, -0.05); // Angle Up
+        carShape.lineTo(drawRW + 0.35, -0.05); // Flat Top
+        carShape.lineTo(drawRW + 0.55, -0.3);  // Angle Down
         
         // Side skirt
-        carShape.lineTo(fwX - 0.55, -0.3);
+        carShape.lineTo(drawFW - 0.55, -0.3);
         
         // Front Wheel Well
-        carShape.lineTo(fwX - 0.55, -0.3);
-        carShape.lineTo(fwX - 0.35, -0.05);
-        carShape.lineTo(fwX + 0.35, -0.05);
-        carShape.lineTo(fwX + 0.55, -0.3);
+        carShape.lineTo(drawFW - 0.55, -0.3);
+        carShape.lineTo(drawFW - 0.35, -0.05);
+        carShape.lineTo(drawFW + 0.35, -0.05);
+        carShape.lineTo(drawFW + 0.55, -0.3);
         
         // Front bumper
         carShape.lineTo(1.4, -0.3);
@@ -664,6 +713,15 @@ window.addEventListener('load', () => {
             headlights: [lightL, lightR],
             grounded: { rear: 0, front: 0 },
             setGrounded(id, val) { this.grounded[id] += val ? 1 : -1; },
+            destroy() {
+                // Helper to remove visuals and physics
+                scene.remove(this.chassis.getUserData().mesh);
+                scene.remove(this.rear.getUserData().mesh);
+                scene.remove(this.front.getUserData().mesh);
+                world.destroyBody(this.chassis);
+                world.destroyBody(this.rear);
+                world.destroyBody(this.front);
+            },
             reset(pos) {
                 this.chassis.setPosition(pos); this.chassis.setAngle(0); this.chassis.setLinearVelocity(Vec2(0,0)); this.chassis.setAngularVelocity(0);
                 const rPos = chassis.getWorldPoint(Vec2(-vp.TRACK_WIDTH/2, -1));
