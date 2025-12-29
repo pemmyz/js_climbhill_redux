@@ -317,23 +317,29 @@ window.addEventListener('load', () => {
                 if(id) panels[id].classList.remove('hidden');
             };
 
-            let wheelbaseDirty = false;
-
             document.getElementById('help-toggle-button').onclick = () => toggle('help');
-            document.getElementById('options-toggle-button').onclick = () => toggle('options');
             document.getElementById('close-help-btn').onclick = () => toggle(null);
             document.getElementById('restart-btn').onclick = () => this.handleReset();
 
-            const closeOptions = () => {
-                if(wheelbaseDirty && vehicle) {
+            // Options Logic: Open = Pause+Lift, Close = Unpause(Drop)
+            const openOptions = () => {
+                if(!panels.options.classList.contains('hidden')) return; // Already open
+                
+                gameState.paused = true;
+                if(vehicle) {
                     const pos = vehicle.chassis.getPosition();
                     // Lift 5 meters (approx 4 car heights)
                     vehicle.reset(Vec2(pos.x, pos.y + 5));
-                    wheelbaseDirty = false;
                 }
-                toggle(null);
+                toggle('options');
             };
 
+            const closeOptions = () => {
+                toggle(null);
+                gameState.paused = false;
+            };
+
+            document.getElementById('options-toggle-button').onclick = openOptions;
             document.getElementById('close-options-btn').onclick = closeOptions;
 
             document.getElementById('graphics-select').addEventListener('change', (e) => {
@@ -366,7 +372,6 @@ window.addEventListener('load', () => {
                 const val = parseFloat(e.target.value);
                 widthDisp.innerText = val.toFixed(1);
                 VEHICLE_PARAMS.TRACK_WIDTH = val;
-                wheelbaseDirty = true;
 
                 if (vehicle) {
                     const pos = vehicle.chassis.getPosition().clone();
@@ -376,7 +381,7 @@ window.addEventListener('load', () => {
 
                     vehicle.destroy();
 
-                    vehicle = createVehicle(pos.clone().add(Vec2(0, 0.1)), angle);
+                    vehicle = createVehicle(pos, angle);
                     
                     vehicle.chassis.setLinearVelocity(linVel);
                     vehicle.chassis.setAngularVelocity(angVel);
@@ -421,10 +426,10 @@ window.addEventListener('load', () => {
                 if (e.code === 'KeyD') { gameState.debug = !gameState.debug; }
                 if (e.code === 'KeyH') toggle('help');
                 if (e.code === 'KeyO') {
-                    if(!panels.options.classList.contains('hidden')) {
-                        closeOptions();
+                    if(panels.options.classList.contains('hidden')) {
+                        openOptions();
                     } else {
-                        toggle('options');
+                        closeOptions();
                     }
                 }
             });
