@@ -29,9 +29,7 @@ window.addEventListener('load', () => {
 
     const VEHICLE_PARAMS = {
         CHASSIS_MASS: 180,
-        REAR_BAR_DIM: { w: 1.2, h: 0.25 },
-        FRONT_BAR_DIM: { w: 0.8, h: 0.25 },
-        FRONT_BAR_OFFSET: { x: 0.8, y: -0.05 },
+        // Used only for reference in wheel calculations, body is now custom
         WHEEL_MASS: 12, WHEEL_RADIUS: 0.35, WHEEL_FRICTION: 1.6, WHEEL_RESTITUTION: 0.05,
         TRACK_WIDTH: 1.5,
         SUSPENSION_FREQ_HZ: 2.0, SUSPENSION_DAMPING_RATIO: 0.45, SUSPENSION_TRAVEL: 0.35,
@@ -536,33 +534,101 @@ window.addEventListener('load', () => {
         const vp = VEHICLE_PARAMS;
 
         const chassis = world.createDynamicBody({ position: pos, angularDamping: 0.1 });
-        const density = vp.CHASSIS_MASS / 1.0; 
+        const density = vp.CHASSIS_MASS / 3.0; 
         
-        chassis.createFixture(pl.Box(vp.REAR_BAR_DIM.w/2, vp.REAR_BAR_DIM.h/2, Vec2(-0.2, 0)), { density, filterGroupIndex: -1 });
-        chassis.createFixture(pl.Box(vp.FRONT_BAR_DIM.w/2, vp.FRONT_BAR_DIM.h/2, Vec2(vp.FRONT_BAR_OFFSET.x, vp.FRONT_BAR_OFFSET.y)), { density, filterGroupIndex: -1 });
+        // Physics Body: A single polygon approximating the car shape
+        // This keeps the center of mass roughly where it was but fits the new visual shape
+        const vertices = [
+            Vec2(-1.2, -0.3), // Rear Bumper Bottom
+            Vec2(1.3, -0.3),  // Front Bumper Bottom
+            Vec2(1.3, 0.2),   // Hood Front
+            Vec2(0.6, 0.4),   // Hood/Windshield
+            Vec2(-0.8, 0.4),  // Roof/Rear Window
+            Vec2(-1.2, 0.2)   // Trunk Top
+        ];
+        
+        chassis.createFixture(pl.Polygon(vertices), { density, filterGroupIndex: -1 });
         chassis.setUserData({ type: 'chassis' });
 
-        // Visuals
+        // --- Visuals (Red Car with Wheel Wells) ---
         const chassisGroup = new THREE.Group();
-        const rearMat = new THREE.MeshStandardMaterial({ color: 0x3366cc, roughness: 0.4, metalness: 0.6 });
         
-        const rearGeo = new THREE.BoxGeometry(vp.REAR_BAR_DIM.w, vp.REAR_BAR_DIM.h, 1);
-        const rearMesh = new THREE.Mesh(rearGeo, rearMat);
-        rearMesh.position.set(-0.2, 0, 0);
-        rearMesh.castShadow = true;
+        // Create the profile of the car
+        const carShape = new THREE.Shape();
+        const rwX = -vp.TRACK_WIDTH/2; // Rear wheel X
+        const fwX = vp.TRACK_WIDTH/2;  // Front wheel X
+        const wellRadius = vp.WHEEL_RADIUS + 0.1; 
+        
+        // Start bottom rear bumper
+        carShape.moveTo(-1.3, -0.3); 
+        
+        // Rear Wheel Well (Arc)
+        // Note: In visual space, wheels are around y = -1.0 relative to chassis center
+        // So we draw the arc around y = -1.0
+        carShape.lineTo(rwX - wellRadius, -0.3);
+        carShape.absarc(rwX, -1.0, wellRadius, Math.PI - 0.5, 0.5, true); 
+        
+        // Side skirt between wheels
+        carShape.lineTo(fwX - wellRadius, -0.3);
+        
+        // Front Wheel Well (Arc)
+        carShape.absarc(fwX, -1.0, wellRadius, Math.PI - 0.5, 0.5, true); 
+        
+        // Front bumper
+        carShape.lineTo(1.4, -0.3);
+        carShape.lineTo(1.4, 0.1); // Front grill height
+        
+        // Hood
+        carShape.lineTo(0.7, 0.25);
+        // Windshield
+        carShape.lineTo(0.3, 0.6);
+        // Roof
+        carShape.lineTo(-0.7, 0.6);
+        // Rear Window
+        carShape.lineTo(-1.1, 0.3);
+        // Trunk
+        carShape.lineTo(-1.3, 0.3);
+        // Back down
+        carShape.lineTo(-1.3, -0.3);
 
-        const frontGeo = new THREE.BoxGeometry(vp.FRONT_BAR_DIM.w, vp.FRONT_BAR_DIM.h, 0.8);
-        const frontMesh = new THREE.Mesh(frontGeo, rearMat);
-        frontMesh.position.set(vp.FRONT_BAR_OFFSET.x, vp.FRONT_BAR_OFFSET.y, 0);
-        frontMesh.castShadow = true;
-        
-        const cockpit = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 0.8), new THREE.MeshStandardMaterial({ color: 0x111111 }));
-        cockpit.position.set(-0.2, 0.35, 0);
-        
-        const lightL = new THREE.PointLight(0xffffaa, 1, 10); lightL.position.set(1.5, 0, 0.4); chassisGroup.add(lightL);
-        const lightR = new THREE.PointLight(0xffffaa, 1, 10); lightR.position.set(1.5, 0, -0.4); chassisGroup.add(lightR);
+        const extrudeSettings = { 
+            depth: 1.0, 
+            bevelEnabled: true, 
+            bevelSegments: 2, 
+            steps: 2, 
+            bevelSize: 0.05, 
+            bevelThickness: 0.05 
+        };
 
-        chassisGroup.add(rearMesh, frontMesh, cockpit);
+        const carGeo = new THREE.ExtrudeGeometry(carShape, extrudeSettings);
+        // Center the geometry on the Z axis
+        carGeo.translate(0, 0, -0.5);
+
+        const carMat = new THREE.MeshStandardMaterial({ 
+            color: 0xcc0000, // RED
+            roughness: 0.3, 
+            metalness: 0.5 
+        });
+        
+        const carMesh = new THREE.Mesh(carGeo, carMat);
+        carMesh.castShadow = true;
+
+        // Add windows (Simple black boxes intersecting)
+        const windowMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.1, metalness: 0.9 });
+        const cabinGeo = new THREE.BoxGeometry(1.2, 0.35, 0.95);
+        const cabin = new THREE.Mesh(cabinGeo, windowMat);
+        cabin.position.set(-0.2, 0.4, 0);
+        
+        const lightL = new THREE.PointLight(0xffffaa, 1, 10); lightL.position.set(1.4, 0, 0.3); chassisGroup.add(lightL);
+        const lightR = new THREE.PointLight(0xffffaa, 1, 10); lightR.position.set(1.4, 0, -0.3); chassisGroup.add(lightR);
+        
+        // Headlight Meshes
+        const hlGeo = new THREE.BoxGeometry(0.1, 0.1, 0.2);
+        const hlMat = new THREE.MeshBasicMaterial({ color: 0xffffaa });
+        const hlL = new THREE.Mesh(hlGeo, hlMat); hlL.position.copy(lightL.position);
+        const hlR = new THREE.Mesh(hlGeo, hlMat); hlR.position.copy(lightR.position);
+
+        chassisGroup.add(carMesh, cabin, hlL, hlR);
         scene.add(chassisGroup);
         chassis.setUserData({ mesh: chassisGroup, type: 'chassis' });
 

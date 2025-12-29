@@ -4,7 +4,7 @@
     --hud-bg: rgba(0, 0, 0, 0.6);
     --btn-bg: rgba(255, 255, 255, 0.2);
     --btn-active-bg: rgba(255, 255, 255, 0.4);
-    --accent: #ff9e40;
+    --accent: #ff4040; /* Changed accent to red to match car */
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
