@@ -9,6 +9,7 @@ window.addEventListener('load', () => {
         dayCycleDuration: 120,
         
         // Physics Settings
+        suspension: 'original', // 'original' or 'modern' (Progressive)
         physicsMode: 'modern',
         physicsHz: 60,       // Frequency (Steps per second)
         physicsIter: 8,      // Solver iterations (Precision)
@@ -340,10 +341,15 @@ window.addEventListener('load', () => {
 
             // Physics Handlers
             const physModeSelect = document.getElementById('physics-mode-select');
+            const suspSelect = document.getElementById('suspension-select');
             const hzSlider = document.getElementById('phys-hz-slider');
             const iterSlider = document.getElementById('phys-iter-slider');
             const hzDisp = document.getElementById('phys-hz-display');
             const iterDisp = document.getElementById('phys-iter-display');
+
+            suspSelect.addEventListener('change', (e) => {
+                SETTINGS.suspension = e.target.value;
+            });
 
             const applyPhysPreset = (mode) => {
                 if(mode === 'custom') return;
@@ -552,10 +558,6 @@ window.addEventListener('load', () => {
 
         // --- Visuals (Red Car with Wheel Wells) ---
         const chassisGroup = new THREE.Group();
-        
-
-
-// ... inside createVehicle function ...
 
         // Create the profile of the car (Low Poly Version)
         const carShape = new THREE.Shape();
@@ -608,10 +610,6 @@ window.addEventListener('load', () => {
         };
 
         const carGeo = new THREE.ExtrudeGeometry(carShape, extrudeSettings);
-        // ... rest of createVehicle ...
-
-
-
 
         // Center the geometry on the Z axis
         carGeo.translate(0, 0, -0.5);
@@ -697,6 +695,54 @@ window.addEventListener('load', () => {
                 let t = -input.pitch * vp.AIR_CONTROL_TORQUE;
                 t -= this.chassis.getAngularVelocity() * vp.AIR_CONTROL_DAMPING;
                 this.chassis.applyTorque(t, true);
+
+                // --- PROGRESSIVE SUSPENSION LOGIC ---
+                if (SETTINGS.suspension === 'modern') {
+                    // Check compression of both joints
+                    const joints = [this.rJoint, this.fJoint];
+                    const wheels = [this.rear, this.front];
+
+                    for(let i=0; i<joints.length; i++) {
+                        const joint = joints[i];
+                        
+                        // In standard WheelJoint config (axis 0,1), positive translation means wheel is extending down (rebound)
+                        // Negative or smaller values mean it's moving up towards chassis (compression).
+                        // However, WheelJoint behavior can vary. Let's use getJointTranslation.
+                        const translation = joint.getJointTranslation();
+
+                        // NOTE: WheelJoint default springs are linear. To make it "stiffen the more it is compressed",
+                        // we apply an opposing force to the chassis when the wheel moves too far "up" (compression).
+                        
+                        // Based on the setup: chassis at 0, wheel at -1 relative to chassis initially.
+                        // When hitting a bump, wheel moves UP relative to car. 
+                        // The translation value typically increases (becomes less negative) or decreases depending on axis definition.
+                        // Standard Box2D WheelJoint axis (0,1): Translation is dot(axis, pB - pA).
+                        // If B (wheel) moves up towards A (chassis), pB.y increases, so translation increases.
+                        
+                        // We assume travel range is roughly -0.5 to +0.5 around equilibrium.
+                        // Let's define "compressed" as translation > 0.1 (arbitrary based on visual).
+                        // Or simply: apply force exponential to translation.
+                        
+                        if (translation > 0) {
+                            // The spring is compressing (wheel moving up into well)
+                            // Apply non-linear stiffness (Progressive)
+                            // F = k * x^3
+                            
+                            const stiffFactor = 6000; // Tunable stiffness multiplier
+                            const forceMag = stiffFactor * Math.pow(translation, 3);
+                            
+                            // Apply upward force to chassis at the wheel anchor point
+                            const anchor = joint.getAnchorA();
+                            const force = Vec2(0, forceMag);
+                            
+                            // Rotate force by chassis angle to keep it relative
+                            const angle = this.chassis.getAngle();
+                            const rotForce = pl.Rot.mul(pl.Rot(angle), force);
+
+                            this.chassis.applyForce(rotForce, anchor, true);
+                        }
+                    }
+                }
             }
         };
         
