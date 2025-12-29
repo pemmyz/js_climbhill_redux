@@ -4,35 +4,32 @@ window.addEventListener('load', () => {
 
     // --- CONFIGURATION ---
     const SETTINGS = {
-        graphics: 'modern', // 'modern', 'classic', or 'basic'
+        graphics: 'modern', 
         cameraZoom: 28,
         dayCycleDuration: 120,
         
-        // Physics Settings
-        suspension: 'original', // 'original' or 'modern' (Progressive)
+        suspension: 'original',
         physicsMode: 'modern',
-        physicsHz: 60,       // Frequency (Steps per second)
-        physicsIter: 8,      // Solver iterations (Precision)
+        physicsHz: 60,
+        physicsIter: 8,
     };
 
-    // Physics constants used for clamping
     const PHYS_CONST = {
         GRAVITY: -10,
-        MAX_FRAME_TIME: 0.1 // Prevent spiral of death on lag
+        MAX_FRAME_TIME: 0.1 
     };
 
-    // Presets for Physics Modes
     const PHYSICS_PRESETS = {
-        modern: { hz: 60, iter: 8 },  // High precision, standard speed
-        classic: { hz: 60, iter: 4 }, // Standard speed, less calculation
-        basic: { hz: 30, iter: 2 }    // Fast calculation, loose/bouncy physics
+        modern: { hz: 60, iter: 8 },
+        classic: { hz: 60, iter: 4 },
+        basic: { hz: 30, iter: 2 }
     };
 
     const VEHICLE_PARAMS = {
         CHASSIS_MASS: 180,
-        // Used only for reference in wheel calculations, body is now custom
         WHEEL_MASS: 12, WHEEL_RADIUS: 0.35, WHEEL_FRICTION: 1.6, WHEEL_RESTITUTION: 0.05,
-        TRACK_WIDTH: 1.5,
+        // Using 1.8 to keep wheels "apart" but fitting inside the original body
+        TRACK_WIDTH: 1.8,
         SUSPENSION_FREQ_HZ: 2.0, SUSPENSION_DAMPING_RATIO: 0.45, SUSPENSION_TRAVEL: 0.35,
         MOTOR_TORQUE: 900, MOTOR_MAX_SPEED: 70, BRAKE_TORQUE: 1800,
         AIR_CONTROL_TORQUE: 1800, AIR_CONTROL_DAMPING: 30
@@ -327,7 +324,6 @@ window.addEventListener('load', () => {
             document.getElementById('close-options-btn').onclick = () => toggle(null);
             document.getElementById('restart-btn').onclick = () => this.handleReset();
 
-            // Graphics Handlers
             document.getElementById('graphics-select').addEventListener('change', (e) => {
                 SETTINGS.graphics = e.target.value;
                 terrainManager.refreshGraphics();
@@ -339,7 +335,6 @@ window.addEventListener('load', () => {
                 document.getElementById('zoom-display').innerText = SETTINGS.cameraZoom;
             };
 
-            // Physics Handlers
             const physModeSelect = document.getElementById('physics-mode-select');
             const suspSelect = document.getElementById('suspension-select');
             const hzSlider = document.getElementById('phys-hz-slider');
@@ -357,7 +352,6 @@ window.addEventListener('load', () => {
                 SETTINGS.physicsHz = p.hz;
                 SETTINGS.physicsIter = p.iter;
                 
-                // Update UI sliders
                 hzSlider.value = p.hz;
                 iterSlider.value = p.iter;
                 hzDisp.innerText = p.hz;
@@ -463,7 +457,6 @@ window.addEventListener('load', () => {
 
             for (let x = startX + TERRAIN.DENSITY; x <= startX + TERRAIN.SEGMENT_LEN; x += TERRAIN.DENSITY) {
                 let y = heightFn(x);
-                // Slope Limiter
                 const slope = (y - lastY) / TERRAIN.DENSITY;
                 if (Math.abs(slope) > 0.8) y = lastY + Math.sign(slope) * 0.8 * TERRAIN.DENSITY;
                 
@@ -542,8 +535,7 @@ window.addEventListener('load', () => {
         const chassis = world.createDynamicBody({ position: pos, angularDamping: 0.1 });
         const density = vp.CHASSIS_MASS / 3.0; 
         
-        // Physics Body: A single polygon approximating the car shape
-        // This keeps the center of mass roughly where it was but fits the new visual shape
+        // REVERTED to Original Compact Body Dimensions
         const vertices = [
             Vec2(-1.2, -0.3), // Rear Bumper Bottom
             Vec2(1.3, -0.3),  // Front Bumper Bottom
@@ -559,7 +551,7 @@ window.addEventListener('load', () => {
         // --- Visuals (Red Car with Wheel Wells) ---
         const chassisGroup = new THREE.Group();
 
-        // Create the profile of the car (Low Poly Version)
+        // REVERTED to Original Compact Shape
         const carShape = new THREE.Shape();
         const rwX = -vp.TRACK_WIDTH/2; 
         const fwX = vp.TRACK_WIDTH/2;  
@@ -567,7 +559,7 @@ window.addEventListener('load', () => {
         // Start bottom rear bumper
         carShape.moveTo(-1.3, -0.3); 
         
-        // Rear Wheel Well (Low Poly: 3 straight lines instead of smooth arc)
+        // Rear Wheel Well
         carShape.lineTo(rwX - 0.55, -0.3); 
         carShape.lineTo(rwX - 0.35, -0.05); // Angle Up
         carShape.lineTo(rwX + 0.35, -0.05); // Flat Top
@@ -576,7 +568,7 @@ window.addEventListener('load', () => {
         // Side skirt
         carShape.lineTo(fwX - 0.55, -0.3);
         
-        // Front Wheel Well (Low Poly)
+        // Front Wheel Well
         carShape.lineTo(fwX - 0.55, -0.3);
         carShape.lineTo(fwX - 0.35, -0.05);
         carShape.lineTo(fwX + 0.35, -0.05);
@@ -599,12 +591,11 @@ window.addEventListener('load', () => {
         // Back down
         carShape.lineTo(-1.3, -0.3);
 
-        // Low Poly Extrusion Settings
         const extrudeSettings = { 
             depth: 1.0, 
             bevelEnabled: true, 
-            bevelSegments: 0, // 0 = Hard edges (Low Poly)
-            steps: 1,         // 1 = No extra geometry along the length
+            bevelSegments: 0, 
+            steps: 1,         
             bevelSize: 0.05, 
             bevelThickness: 0.05 
         };
@@ -615,7 +606,7 @@ window.addEventListener('load', () => {
         carGeo.translate(0, 0, -0.5);
 
         const carMat = new THREE.MeshStandardMaterial({ 
-            color: 0xcc0000, // RED
+            color: 0xcc0000, 
             roughness: 0.3, 
             metalness: 0.5 
         });
@@ -623,16 +614,15 @@ window.addEventListener('load', () => {
         const carMesh = new THREE.Mesh(carGeo, carMat);
         carMesh.castShadow = true;
 
-        // Add windows (Simple black boxes intersecting)
         const windowMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.1, metalness: 0.9 });
         const cabinGeo = new THREE.BoxGeometry(1.2, 0.35, 0.95);
         const cabin = new THREE.Mesh(cabinGeo, windowMat);
         cabin.position.set(-0.2, 0.4, 0);
         
+        // Reverted Light positions
         const lightL = new THREE.PointLight(0xffffaa, 1, 10); lightL.position.set(1.4, 0, 0.3); chassisGroup.add(lightL);
         const lightR = new THREE.PointLight(0xffffaa, 1, 10); lightR.position.set(1.4, 0, -0.3); chassisGroup.add(lightR);
         
-        // Headlight Meshes
         const hlGeo = new THREE.BoxGeometry(0.1, 0.1, 0.2);
         const hlMat = new THREE.MeshBasicMaterial({ color: 0xffffaa });
         const hlL = new THREE.Mesh(hlGeo, hlMat); hlL.position.copy(lightL.position);
@@ -646,9 +636,11 @@ window.addEventListener('load', () => {
             const wheelBody = world.createDynamicBody({ position: chassis.getWorldPoint(Vec2(xOffset, -1)), angularDamping: 0.1 });
             wheelBody.createFixture(pl.Circle(vp.WHEEL_RADIUS), { density: vp.WHEEL_MASS, friction: vp.WHEEL_FRICTION, restitution: 0, filterGroupIndex: -1, userData: { type: 'wheel', wheelId: label, owner: null } });
             
+            // Keeps the vertical constraint
             const joint = world.createJoint(pl.WheelJoint({
                 motorSpeed: 0, enableMotor: false, maxMotorTorque: 0,
-                frequencyHz: vp.SUSPENSION_FREQ_HZ, dampingRatio: vp.SUSPENSION_DAMPING_RATIO
+                frequencyHz: vp.SUSPENSION_FREQ_HZ, dampingRatio: vp.SUSPENSION_DAMPING_RATIO,
+                collideConnected: false 
             }, chassis, wheelBody, chassis.getWorldPoint(Vec2(xOffset, -1)), chassis.getWorldVector(Vec2(0, 1))));
 
             const wGeo = new THREE.CylinderGeometry(vp.WHEEL_RADIUS, vp.WHEEL_RADIUS, 0.4, 16);
@@ -669,7 +661,7 @@ window.addEventListener('load', () => {
 
         const obj = {
             chassis, rear: rear.body, front: front.body, rJoint: rear.joint, fJoint: front.joint,
-            headlights: [lightL, lightR], // Expose headlights for environment control
+            headlights: [lightL, lightR],
             grounded: { rear: 0, front: 0 },
             setGrounded(id, val) { this.grounded[id] += val ? 1 : -1; },
             reset(pos) {
@@ -698,44 +690,18 @@ window.addEventListener('load', () => {
 
                 // --- PROGRESSIVE SUSPENSION LOGIC ---
                 if (SETTINGS.suspension === 'modern') {
-                    // Check compression of both joints
                     const joints = [this.rJoint, this.fJoint];
-                    const wheels = [this.rear, this.front];
-
                     for(let i=0; i<joints.length; i++) {
                         const joint = joints[i];
-                        
-                        // In standard WheelJoint config (axis 0,1), positive translation means wheel is extending down (rebound)
-                        // Negative or smaller values mean it's moving up towards chassis (compression).
-                        // However, WheelJoint behavior can vary. Let's use getJointTranslation.
                         const translation = joint.getJointTranslation();
-
-                        // NOTE: WheelJoint default springs are linear. To make it "stiffen the more it is compressed",
-                        // we apply an opposing force to the chassis when the wheel moves too far "up" (compression).
-                        
-                        // Based on the setup: chassis at 0, wheel at -1 relative to chassis initially.
-                        // When hitting a bump, wheel moves UP relative to car. 
-                        // The translation value typically increases (becomes less negative) or decreases depending on axis definition.
-                        // Standard Box2D WheelJoint axis (0,1): Translation is dot(axis, pB - pA).
-                        // If B (wheel) moves up towards A (chassis), pB.y increases, so translation increases.
-                        
-                        // We assume travel range is roughly -0.5 to +0.5 around equilibrium.
-                        // Let's define "compressed" as translation > 0.1 (arbitrary based on visual).
-                        // Or simply: apply force exponential to translation.
                         
                         if (translation > 0) {
-                            // The spring is compressing (wheel moving up into well)
-                            // Apply non-linear stiffness (Progressive)
-                            // F = k * x^3
-                            
-                            const stiffFactor = 6000; // Tunable stiffness multiplier
+                            const stiffFactor = 6000; 
                             const forceMag = stiffFactor * Math.pow(translation, 3);
                             
-                            // Apply upward force to chassis at the wheel anchor point
                             const anchor = joint.getAnchorA();
                             const force = Vec2(0, forceMag);
                             
-                            // Rotate force by chassis angle to keep it relative
                             const angle = this.chassis.getAngle();
                             const rotForce = pl.Rot.mul(pl.Rot(angle), force);
 
@@ -764,29 +730,17 @@ window.addEventListener('load', () => {
 
         if (!gameState.paused) {
             input.update();
-            
-            // Dynamic Physics Steps
-            // Higher Hz = smaller step size (more steps per second)
-            // Lower Hz = larger step size (less precision, faster calc)
             const physicsStepSize = 1 / SETTINGS.physicsHz;
-            
             accumulator += dt;
-            
-            // Limit loops to prevent spiral of death
             const maxSteps = 5; 
             let steps = 0;
 
             while (accumulator >= physicsStepSize && steps < maxSteps) {
                 vehicle.update(physicsStepSize, input);
-                
-                // world.step(timeStep, velocityIterations, positionIterations)
-                // We pass the dynamic iterations from settings here
                 world.step(physicsStepSize, SETTINGS.physicsIter, SETTINGS.physicsIter);
-                
                 accumulator -= physicsStepSize;
                 steps++;
             }
-            // Discard excess accumulator to prevent buildup on slow frames
             if(accumulator > physicsStepSize) accumulator = 0;
 
             if (!gameState.gameOver && !gameState.debug) {
@@ -797,7 +751,6 @@ window.addEventListener('load', () => {
                 }
             }
 
-            // Sync visual mesh with physics body
             for (let b = world.getBodyList(); b; b = b.getNext()) {
                 const ud = b.getUserData();
                 if (ud && ud.mesh) {
@@ -836,8 +789,6 @@ window.addEventListener('load', () => {
         renderer.render(scene, camera);
     }
 
-
-    // --- BOOTSTRAP ---
     initGraphics();
     environment = new Environment();
     initPhysics();
