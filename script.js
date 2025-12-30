@@ -782,6 +782,7 @@ window.addEventListener('load', () => {
 
     // --- MAIN LOOP ---
     let lastTime = 0, accumulator = 0;
+    let lastUIUpdate = 0;
 
     function gameLoop(time) {
         requestAnimationFrame(gameLoop);
@@ -838,11 +839,34 @@ window.addEventListener('load', () => {
             terrainManager.update(cp.x);
             environment.update(dt, cp);
 
-            if(Math.floor(time) % 10 === 0) {
+            // Update UI every 100ms
+            if(time - lastUIUpdate > 100) {
+                lastUIUpdate = time;
+
                 document.getElementById('speed-value').innerText = Math.floor(vehicle.chassis.getLinearVelocity().length() * 3.6);
+                
+                // RPM: rad/s * 9.55
+                document.getElementById('rpm-value').innerText = Math.floor(Math.abs(vehicle.rear.getAngularVelocity()) * 9.55);
+                
+                // Torque: Input throttle * max
+                const torque = input.throttle ? input.throttle * VEHICLE_PARAMS.MOTOR_TORQUE : 0;
+                document.getElementById('torque-value').innerText = Math.floor(torque);
+                
+                // Angle and Slope
+                const angleRad = vehicle.chassis.getAngle();
+                const angleDeg = (angleRad * 180 / Math.PI) % 360;
+                document.getElementById('angle-value').innerText = angleDeg.toFixed(1);
+                
+                // Slope %, cap at reasonable view for UI (e.g., extreme angles make tan huge)
+                let slopeVal = Math.tan(angleRad) * 100;
+                if(Math.abs(slopeVal) > 999) slopeVal = 999 * Math.sign(slopeVal); 
+                document.getElementById('slope-value').innerText = slopeVal.toFixed(1);
+
                 document.getElementById('fuel-value').innerText = Math.floor(gameState.fuel);
+                
                 gameState.distance = Math.max(gameState.distance, cp.x);
                 document.getElementById('distance-value').innerText = Math.floor(gameState.distance);
+                
                 document.getElementById('phys-debug').innerText = `${SETTINGS.physicsHz}Hz/${SETTINGS.physicsIter}it`;
                 
                 if (gameState.gameOver) document.getElementById('game-over-panel').classList.remove('hidden');
