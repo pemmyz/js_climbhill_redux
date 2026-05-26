@@ -10,6 +10,8 @@ This project features procedural terrain, real‑time vehicle suspension,
 checkpoints, fuel pickups, dynamic shadows, mobile controls, and a full
 in‑game HUD.
 
+## Play it now: https://pemmyz.github.io/js_climbhill_redux/
+
 ------------------------------------------------------------------------
 
 ## Screenshots
