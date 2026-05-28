@@ -62,11 +62,25 @@ window.addEventListener('load', () => {
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-        window.addEventListener('resize', () => {
+        function handleResize() {
+            // Update camera and renderer to fill the exact screen dimensions
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+            
+            // Toggle body class based on actual fullscreen state
+            if (document.fullscreenElement || document.webkitFullscreenElement) {
+                document.body.classList.add('mobile-mode');
+            } else {
+                document.body.classList.remove('mobile-mode');
+            }
+        }
+
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('fullscreenchange', handleResize);
+        window.addEventListener('webkitfullscreenchange', handleResize);
+        
+        handleResize(); // Trigger initial sizing
     }
 
     // --- ENVIRONMENT SYSTEM ---
@@ -434,11 +448,35 @@ window.addEventListener('load', () => {
                 }
             });
 
+            // Fullscreen trigger setup
+            const mobileBtn = document.getElementById('mobile-btn');
+            if (mobileBtn) {
+                mobileBtn.addEventListener('click', () => {
+                    const el = document.documentElement;
+                    if (el.requestFullscreen) el.requestFullscreen();
+                    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+                });
+            }
+
+            // Hardened touch handlers to strictly prevent scrolling/zooming
             const touchBtn = (id, setter) => {
                 const el = document.getElementById(id);
-                const h = (s) => (e) => { e.preventDefault(); setter(s); };
-                if(el) { el.ontouchstart = h(1); el.ontouchend = h(0); el.onmousedown = h(1); el.onmouseup = h(0); }
+                const h = (s) => (e) => { 
+                    if(e.cancelable) e.preventDefault(); 
+                    setter(s); 
+                };
+                if(el) { 
+                    el.addEventListener('touchstart', h(1), { passive: false });
+                    el.addEventListener('touchend', h(0), { passive: false });
+                    el.addEventListener('touchcancel', h(0), { passive: false });
+                    
+                    // Mouse fallbacks
+                    el.addEventListener('mousedown', h(1));
+                    el.addEventListener('mouseup', h(0));
+                    el.addEventListener('mouseleave', (e) => { if (e.buttons === 1) h(0)(e); });
+                }
             };
+            
             touchBtn('throttle-btn', v => this.throttle = v);
             touchBtn('brake-btn', v => this.brake = v);
             touchBtn('tilt-forward-btn', v => this.pitch = v);

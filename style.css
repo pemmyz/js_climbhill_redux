@@ -8,11 +8,47 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { width: 100%; height: 100%; overflow: hidden; background-color: var(--bg-color); color: var(--primary-text); font-family: 'Monaco', 'Consolas', monospace; }
 
-.game-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+html, body { 
+    width: 100%; 
+    height: 100%; 
+    overflow: hidden; 
+    background-color: #000;
+    color: var(--primary-text); 
+    font-family: 'Monaco', 'Consolas', monospace; 
+}
+
+/* --- MOBILE & FULLSCREEN LOCK --- */
+body.mobile-mode {
+    overflow: hidden;
+    touch-action: none; /* Disables all browser zoom/pan gestures */
+    position: fixed;
+    width: 100%; 
+    height: 100%;
+    top: 0; 
+    left: 0;
+}
+
+/* --- FULLSCREEN CANVAS SETUP --- */
+.game-container { 
+    position: absolute; 
+    top: 0; left: 0; 
+    width: 100%; height: 100%; 
+    z-index: 1; 
+    background: #000;
+}
+
+#screen {
+    width: 100%;
+    height: 100%;
+    background: var(--bg-color);
+    position: absolute;
+    top: 0; left: 0;
+}
+
 canvas { display: block; width: 100%; height: 100%; outline: none; }
 
+/* --- HUD & MENUS --- */
 #hud {
     position: fixed; top: 10px; right: 10px;
     background-color: var(--hud-bg); padding: 10px;
@@ -30,6 +66,7 @@ canvas { display: block; width: 100%; height: 100%; outline: none; }
     max-height: 90vh;
     overflow-y: auto;
 }
+
 .overlay-panel.hidden { display: none; }
 .overlay-panel h2 { text-align: center; margin: 0 0 15px 0; color: var(--accent); }
 .overlay-panel h3 { color: #aaa; border-bottom: 1px solid #444; margin-bottom: 10px; padding-bottom: 5px; font-size: 1.1em;}
@@ -51,33 +88,51 @@ canvas { display: block; width: 100%; height: 100%; outline: none; }
 .overlay-panel th, .overlay-panel td { border: 1px solid #555; padding: 8px; }
 .overlay-panel th { background-color: rgba(255,255,255,0.1); }
 
-/* Mobile */
+/* --- CONTROLS OVERLAY --- */
+#mobile-btn {
+    position: fixed; top: 20px; left: 20px; z-index: 2000;
+    background: #333; color: white; border: 3px solid white;
+    font-size: 24px; padding: 16px 24px; cursor: pointer; border-radius: 8px;
+}
+body.mobile-mode #mobile-btn { display: none; }
+
 #mobile-controls {
     position: fixed; bottom: 20px; left: 0; right: 0;
-    width: 100%; height: 120px; display: none;
-    justify-content: space-between; align-items: center;
-    padding: 0 20px; pointer-events: none; z-index: 20;
+    width: 100%; height: 180px; display: none;
+    justify-content: space-between; align-items: flex-end;
+    padding: 0 40px; pointer-events: none; z-index: 20;
 }
-.mobile-left, .mobile-right { display: flex; gap: 15px; }
+
+.mobile-left, .mobile-right { display: flex; gap: 40px; }
+
 .mobile-btn {
-    width: 80px; height: 80px; border-radius: 50%;
-    border: 2px solid var(--primary-text); background-color: var(--btn-bg);
-    color: var(--primary-text); font-size: 16px; font-weight: bold;
+    width: 150px; height: 150px; border-radius: 50%;
+    border: 3px solid var(--primary-text); background-color: var(--btn-bg);
+    color: var(--primary-text); font-size: 28px; font-weight: bold;
     pointer-events: all; display: flex; justify-content: center; align-items: center;
     user-select: none; -webkit-tap-highlight-color: transparent;
+    margin-bottom: 10px; backdrop-filter: blur(4px);
 }
+
 .mobile-btn:active { background-color: var(--btn-active-bg); transform: scale(0.95); }
+
 #bottom-ui-bar {
     position: fixed; bottom: 10px; left: 10px;
     z-index: 50; display: flex; gap: 10px;
 }
+
 #bottom-ui-bar button {
     background-color: var(--hud-bg); padding: 8px 12px;
     border: 1px solid #444; color: var(--primary-text);
     border-radius: 5px; font-size: 14px; cursor: pointer;
 }
 
+/* Touch Device Behaviors */
 @media (hover: none) and (pointer: coarse), (max-width: 768px) {
     #mobile-controls { display: flex; }
     #bottom-ui-bar { display: none; } 
 }
+
+/* Enforce controls if manual fullscreen was toggled */
+body.mobile-mode #mobile-controls { display: flex; }
+body.mobile-mode #bottom-ui-bar { display: none; }
