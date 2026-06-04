@@ -109,9 +109,13 @@ body.mobile-mode #mobile-btn { display: none; }
     width: 150px; height: 150px; border-radius: 50%;
     border: 3px solid var(--primary-text); background-color: var(--btn-bg);
     color: var(--primary-text); font-size: 28px; font-weight: bold;
-    pointer-events: all; display: flex; justify-content: center; align-items: center;
+    display: flex; justify-content: center; align-items: center;
     user-select: none; -webkit-tap-highlight-color: transparent;
     margin-bottom: 10px; backdrop-filter: blur(4px);
+    
+    /* Crucial touch fixes for Android/Chrome */
+    pointer-events: auto;
+    touch-action: none;
 }
 
 .mobile-btn:active { background-color: var(--btn-active-bg); transform: scale(0.95); }

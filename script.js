@@ -63,12 +63,10 @@ window.addEventListener('load', () => {
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
         function handleResize() {
-            // Update camera and renderer to fill the exact screen dimensions
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
             
-            // Toggle body class based on actual fullscreen state
             if (document.fullscreenElement || document.webkitFullscreenElement) {
                 document.body.classList.add('mobile-mode');
             } else {
@@ -80,7 +78,7 @@ window.addEventListener('load', () => {
         window.addEventListener('fullscreenchange', handleResize);
         window.addEventListener('webkitfullscreenchange', handleResize);
         
-        handleResize(); // Trigger initial sizing
+        handleResize();
     }
 
     // --- ENVIRONMENT SYSTEM ---
@@ -320,6 +318,8 @@ window.addEventListener('load', () => {
     // --- INPUT & UI ---
     const input = {
         throttle: 0, brake: 0, pitch: 0, keys: new Set(),
+        touchStates: { throttle: 0, brake: 0, pitch: 0 },
+        
         init() {
             const panels = {
                 help: document.getElementById('help-panel'),
@@ -335,14 +335,12 @@ window.addEventListener('load', () => {
             document.getElementById('close-help-btn').onclick = () => toggle(null);
             document.getElementById('restart-btn').onclick = () => this.handleReset();
 
-            // Options Logic: Open = Pause+Lift, Close = Unpause(Drop)
             const openOptions = () => {
-                if(!panels.options.classList.contains('hidden')) return; // Already open
+                if(!panels.options.classList.contains('hidden')) return;
                 
                 gameState.paused = true;
                 if(vehicle) {
                     const pos = vehicle.chassis.getPosition();
-                    // Lift 5 meters (approx 4 car heights)
                     vehicle.reset(Vec2(pos.x, pos.y + 5));
                 }
                 toggle('options');
@@ -367,7 +365,6 @@ window.addEventListener('load', () => {
                 document.getElementById('zoom-display').innerText = SETTINGS.cameraZoom;
             };
 
-            // Physics Handlers
             const physModeSelect = document.getElementById('physics-mode-select');
             const suspSelect = document.getElementById('suspension-select');
             const widthSlider = document.getElementById('track-width-slider');
@@ -381,7 +378,6 @@ window.addEventListener('load', () => {
                 SETTINGS.suspension = e.target.value;
             });
 
-            // Handle Wheelbase Slider
             widthSlider.addEventListener('input', (e) => {
                 const val = parseFloat(e.target.value);
                 widthDisp.innerText = val.toFixed(1);
@@ -394,12 +390,10 @@ window.addEventListener('load', () => {
                     const angVel = vehicle.chassis.getAngularVelocity();
 
                     vehicle.destroy();
-
                     vehicle = createVehicle(pos, angle);
                     
                     vehicle.chassis.setLinearVelocity(linVel);
                     vehicle.chassis.setAngularVelocity(angVel);
-                    
                     vehicle.rear.setLinearVelocity(linVel);
                     vehicle.front.setLinearVelocity(linVel);
                 }
@@ -448,7 +442,6 @@ window.addEventListener('load', () => {
                 }
             });
 
-            // Fullscreen trigger setup
             const mobileBtn = document.getElementById('mobile-btn');
             if (mobileBtn) {
                 mobileBtn.addEventListener('click', () => {
@@ -458,7 +451,6 @@ window.addEventListener('load', () => {
                 });
             }
 
-            // Hardened touch handlers to strictly prevent scrolling/zooming
             const touchBtn = (id, setter) => {
                 const el = document.getElementById(id);
                 const h = (s) => (e) => { 
@@ -470,23 +462,28 @@ window.addEventListener('load', () => {
                     el.addEventListener('touchend', h(0), { passive: false });
                     el.addEventListener('touchcancel', h(0), { passive: false });
                     
-                    // Mouse fallbacks
                     el.addEventListener('mousedown', h(1));
                     el.addEventListener('mouseup', h(0));
                     el.addEventListener('mouseleave', (e) => { if (e.buttons === 1) h(0)(e); });
                 }
             };
             
-            touchBtn('throttle-btn', v => this.throttle = v);
-            touchBtn('brake-btn', v => this.brake = v);
-            touchBtn('tilt-forward-btn', v => this.pitch = v);
-            touchBtn('tilt-backward-btn', v => this.pitch = -v);
+            touchBtn('throttle-btn', v => this.touchStates.throttle = v);
+            touchBtn('brake-btn', v => this.touchStates.brake = v);
+            touchBtn('tilt-forward-btn', v => this.touchStates.pitch = v);
+            touchBtn('tilt-backward-btn', v => this.touchStates.pitch = -v);
         },
+
         update() {
-            this.throttle = this.keys.has('ArrowUp') ? 1 : (document.getElementById('throttle-btn')?.matches(':active')?1:0);
-            this.brake = this.keys.has('ArrowDown') ? 1 : (document.getElementById('brake-btn')?.matches(':active')?1:0);
-            this.pitch = (this.keys.has('ArrowRight')?1:0) - (this.keys.has('ArrowLeft')?1:0);
+            const keyThrottle = this.keys.has('ArrowUp') ? 1 : 0;
+            const keyBrake = this.keys.has('ArrowDown') ? 1 : 0;
+            const keyPitch = (this.keys.has('ArrowRight') ? 1 : 0) - (this.keys.has('ArrowLeft') ? 1 : 0);
+
+            this.throttle = Math.max(keyThrottle, this.touchStates.throttle);
+            this.brake = Math.max(keyBrake, this.touchStates.brake);
+            this.pitch = keyPitch !== 0 ? keyPitch : this.touchStates.pitch;
         },
+
         handleReset() {
             if (gameState.lastCheckpoint) {
                 vehicle.reset(gameState.lastCheckpoint.pos);
@@ -624,63 +621,48 @@ window.addEventListener('load', () => {
         const chassis = world.createDynamicBody({ position: pos, angularDamping: 0.1 });
         const density = vp.CHASSIS_MASS / 3.0; 
         
-        // Original Compact Body Dimensions
         const vertices = [
-            Vec2(-1.2, -0.3), // Rear Bumper Bottom
-            Vec2(1.3, -0.3),  // Front Bumper Bottom
-            Vec2(1.3, 0.2),   // Hood Front
-            Vec2(0.6, 0.4),   // Hood/Windshield
-            Vec2(-0.8, 0.4),  // Roof/Rear Window
-            Vec2(-1.2, 0.2)   // Trunk Top
+            Vec2(-1.2, -0.3), 
+            Vec2(1.3, -0.3),  
+            Vec2(1.3, 0.2),   
+            Vec2(0.6, 0.4),   
+            Vec2(-0.8, 0.4),  
+            Vec2(-1.2, 0.2)   
         ];
         
         chassis.createFixture(pl.Polygon(vertices), { density, filterGroupIndex: -1 });
         chassis.setUserData({ type: 'chassis' });
 
-        // IMPORTANT: Set angle immediately before creating wheels so calculating world points works correctly
         chassis.setAngle(angle);
 
-        // --- Visuals (Red Car with Wheel Wells) ---
         const chassisGroup = new THREE.Group();
 
         const carShape = new THREE.Shape();
-        // Visuals always drawn with standard track width to keep body consistent
         const drawRW = -1.7/2; 
         const drawFW = 1.7/2;  
         
-        // Start bottom rear bumper
         carShape.moveTo(-1.3, -0.3); 
         
-        // Rear Wheel Well
         carShape.lineTo(drawRW - 0.55, -0.3); 
-        carShape.lineTo(drawRW - 0.35, -0.05); // Angle Up
-        carShape.lineTo(drawRW + 0.35, -0.05); // Flat Top
-        carShape.lineTo(drawRW + 0.55, -0.3);  // Angle Down
+        carShape.lineTo(drawRW - 0.35, -0.05); 
+        carShape.lineTo(drawRW + 0.35, -0.05); 
+        carShape.lineTo(drawRW + 0.55, -0.3);  
         
-        // Side skirt
         carShape.lineTo(drawFW - 0.55, -0.3);
         
-        // Front Wheel Well
         carShape.lineTo(drawFW - 0.55, -0.3);
         carShape.lineTo(drawFW - 0.35, -0.05);
         carShape.lineTo(drawFW + 0.35, -0.05);
         carShape.lineTo(drawFW + 0.55, -0.3);
         
-        // Front bumper
         carShape.lineTo(1.4, -0.3);
         carShape.lineTo(1.4, 0.1); 
         
-        // Hood
         carShape.lineTo(0.7, 0.25);
-        // Windshield
         carShape.lineTo(0.3, 0.6);
-        // Roof
         carShape.lineTo(-0.7, 0.6);
-        // Rear Window
         carShape.lineTo(-1.1, 0.3);
-        // Trunk
         carShape.lineTo(-1.3, 0.3);
-        // Back down
         carShape.lineTo(-1.3, -0.3);
 
         const extrudeSettings = { 
@@ -693,8 +675,6 @@ window.addEventListener('load', () => {
         };
 
         const carGeo = new THREE.ExtrudeGeometry(carShape, extrudeSettings);
-
-        // Center the geometry on the Z axis
         carGeo.translate(0, 0, -0.5);
 
         const carMat = new THREE.MeshStandardMaterial({ 
@@ -711,7 +691,6 @@ window.addEventListener('load', () => {
         const cabin = new THREE.Mesh(cabinGeo, windowMat);
         cabin.position.set(-0.2, 0.4, 0);
         
-        // Reverted Light positions
         const lightL = new THREE.PointLight(0xffffaa, 1, 10); lightL.position.set(1.4, 0, 0.3); chassisGroup.add(lightL);
         const lightR = new THREE.PointLight(0xffffaa, 1, 10); lightR.position.set(1.4, 0, -0.3); chassisGroup.add(lightR);
         
@@ -728,7 +707,6 @@ window.addEventListener('load', () => {
             const wheelBody = world.createDynamicBody({ position: chassis.getWorldPoint(Vec2(xOffset, -1)), angularDamping: 0.1 });
             wheelBody.createFixture(pl.Circle(vp.WHEEL_RADIUS), { density: vp.WHEEL_MASS, friction: vp.WHEEL_FRICTION, restitution: 0, filterGroupIndex: -1, userData: { type: 'wheel', wheelId: label, owner: null } });
             
-            // Keeps the vertical constraint
             const joint = world.createJoint(pl.WheelJoint({
                 motorSpeed: 0, enableMotor: false, maxMotorTorque: 0,
                 frequencyHz: vp.SUSPENSION_FREQ_HZ, dampingRatio: vp.SUSPENSION_DAMPING_RATIO,
@@ -757,7 +735,6 @@ window.addEventListener('load', () => {
             grounded: { rear: 0, front: 0 },
             setGrounded(id, val) { this.grounded[id] += val ? 1 : -1; },
             destroy() {
-                // Helper to remove visuals and physics
                 scene.remove(this.chassis.getUserData().mesh);
                 scene.remove(this.rear.getUserData().mesh);
                 scene.remove(this.front.getUserData().mesh);
@@ -789,7 +766,6 @@ window.addEventListener('load', () => {
                 t -= this.chassis.getAngularVelocity() * vp.AIR_CONTROL_DAMPING;
                 this.chassis.applyTorque(t, true);
 
-                // --- PROGRESSIVE SUSPENSION LOGIC ---
                 if (SETTINGS.suspension === 'modern') {
                     const joints = [this.rJoint, this.fJoint];
                     for(let i=0; i<joints.length; i++) {
@@ -877,25 +853,19 @@ window.addEventListener('load', () => {
             terrainManager.update(cp.x);
             environment.update(dt, cp);
 
-            // Update UI every 100ms
             if(time - lastUIUpdate > 100) {
                 lastUIUpdate = time;
 
                 document.getElementById('speed-value').innerText = Math.floor(vehicle.chassis.getLinearVelocity().length() * 3.6);
-                
-                // RPM: rad/s * 9.55
                 document.getElementById('rpm-value').innerText = Math.floor(Math.abs(vehicle.rear.getAngularVelocity()) * 9.55);
                 
-                // Torque: Input throttle * max
                 const torque = input.throttle ? input.throttle * VEHICLE_PARAMS.MOTOR_TORQUE : 0;
                 document.getElementById('torque-value').innerText = Math.floor(torque);
                 
-                // Angle and Slope
                 const angleRad = vehicle.chassis.getAngle();
                 const angleDeg = (angleRad * 180 / Math.PI) % 360;
                 document.getElementById('angle-value').innerText = angleDeg.toFixed(1);
                 
-                // Slope %, cap at reasonable view for UI (e.g., extreme angles make tan huge)
                 let slopeVal = Math.tan(angleRad) * 100;
                 if(Math.abs(slopeVal) > 999) slopeVal = 999 * Math.sign(slopeVal); 
                 document.getElementById('slope-value').innerText = slopeVal.toFixed(1);
