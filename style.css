@@ -96,27 +96,38 @@ canvas { display: block; width: 100%; height: 100%; outline: none; }
 }
 body.mobile-mode #mobile-btn { display: none; }
 
+
+
+
+
 #mobile-controls {
     position: fixed; bottom: 20px; left: 0; right: 0;
-    width: 100%; height: 180px; display: none;
+    width: 100%; height: 120px; display: none; /* Height scaled down from 180px */
     justify-content: space-between; align-items: flex-end;
-    padding: 0 40px; pointer-events: none; z-index: 20;
+    padding: 0 20px; pointer-events: none; z-index: 20; /* Padding scaled down from 40px */
 }
 
-.mobile-left, .mobile-right { display: flex; gap: 40px; }
+.mobile-left, .mobile-right { 
+    display: flex; 
+    gap: 20px; /* Gap scaled down from 40px */
+}
 
 .mobile-btn {
-    width: 150px; height: 150px; border-radius: 50%;
+    width: 100px; height: 100px; /* Dimensions scaled down from 150px */
+    border-radius: 50%;
     border: 3px solid var(--primary-text); background-color: var(--btn-bg);
-    color: var(--primary-text); font-size: 28px; font-weight: bold;
+    color: var(--primary-text); 
+    font-size: 18px; /* Font size scaled down from 28px */
+    font-weight: bold;
     display: flex; justify-content: center; align-items: center;
     user-select: none; -webkit-tap-highlight-color: transparent;
     margin-bottom: 10px; backdrop-filter: blur(4px);
     
-    /* Crucial touch fixes for Android/Chrome */
     pointer-events: auto;
     touch-action: none;
 }
+
+
 
 .mobile-btn:active { background-color: var(--btn-active-bg); transform: scale(0.95); }
 
