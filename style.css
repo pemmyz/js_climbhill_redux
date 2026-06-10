@@ -145,9 +145,9 @@ body.mobile-mode #mobile-btn { display: none; }
 /* Touch Device Behaviors */
 @media (hover: none) and (pointer: coarse), (max-width: 768px) {
     #mobile-controls { display: flex; }
-    #bottom-ui-bar { display: none; } 
+    #bottom-ui-bar { bottom: 150px; } /* Shifts menu above touch controls instead of hiding */
 }
 
 /* Enforce controls if manual fullscreen was toggled */
 body.mobile-mode #mobile-controls { display: flex; }
-body.mobile-mode #bottom-ui-bar { display: none; }
+body.mobile-mode #bottom-ui-bar { bottom: 150px; } /* Shifts menu above touch controls instead of hiding */

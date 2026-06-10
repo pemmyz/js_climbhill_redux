@@ -2,8 +2,11 @@
 
 window.addEventListener('load', () => {
 
-    // --- CONFIGURATION ---
+// --- CONFIGURATION ---
     const SETTINGS = {
+        vehicleType: 'moped',    // Visual appearance (meshes, hitboxes)
+        physicsProfile: 'car',   // Physical behavior (mass, torque, joints)
+        
         graphics: 'modern', 
         cameraZoom: 28,
         dayCycleDuration: 120,
@@ -14,10 +17,7 @@ window.addEventListener('load', () => {
         physicsIter: 8,
     };
 
-    const PHYS_CONST = {
-        GRAVITY: -10,
-        MAX_FRAME_TIME: 0.1 
-    };
+    const PHYS_CONST = { GRAVITY: -10, MAX_FRAME_TIME: 0.1 };
 
     const PHYSICS_PRESETS = {
         modern: { hz: 60, iter: 8 },
@@ -25,20 +25,38 @@ window.addEventListener('load', () => {
         basic: { hz: 30, iter: 2 }
     };
 
-    const VEHICLE_PARAMS = {
-        CHASSIS_MASS: 180,
-        WHEEL_MASS: 12, WHEEL_RADIUS: 0.35, WHEEL_FRICTION: 1.6, WHEEL_RESTITUTION: 0.05,
-        TRACK_WIDTH: 1.7,
-        SUSPENSION_FREQ_HZ: 2.0, SUSPENSION_DAMPING_RATIO: 0.45, SUSPENSION_TRAVEL: 0.35,
-        MOTOR_TORQUE: 900, MOTOR_MAX_SPEED: 70, BRAKE_TORQUE: 1800,
-        AIR_CONTROL_TORQUE: 1800, AIR_CONTROL_DAMPING: 30
+// Dictionary of physics parameters based on selection
+    const VEHICLE_CONFIGS = {
+        moped: {
+            CHASSIS_DENSITY: 40,
+            WHEEL_MASS: 6, WHEEL_RADIUS: 0.38, WHEEL_FRICTION: 2.2, WHEEL_RESTITUTION: 0.05,
+            TRACK_WIDTH: 2.0, // Updated to 2.0m
+            SUSPENSION_FREQ_HZ: 3.5, SUSPENSION_DAMPING_RATIO: 0.35, SUSPENSION_TRAVEL: 0.5,
+            MOTOR_TORQUE: 750, MOTOR_MAX_SPEED: 80, BRAKE_TORQUE: 900,
+            AIR_CONTROL_TORQUE: 900, AIR_CONTROL_DAMPING: 25
+        },
+        car: {
+            CHASSIS_DENSITY: 60,
+            WHEEL_MASS: 12, WHEEL_RADIUS: 0.35, WHEEL_FRICTION: 1.6, WHEEL_RESTITUTION: 0.05,
+            TRACK_WIDTH: 2.0, // Updated to 2.0m
+            SUSPENSION_FREQ_HZ: 2.0, SUSPENSION_DAMPING_RATIO: 0.45, SUSPENSION_TRAVEL: 0.35,
+            MOTOR_TORQUE: 900, MOTOR_MAX_SPEED: 70, BRAKE_TORQUE: 1800,
+            AIR_CONTROL_TORQUE: 1800, AIR_CONTROL_DAMPING: 30
+        }
     };
 
-    const TERRAIN = { 
-        SEGMENT_LEN: 100, 
-        DENSITY: 1.2 
-    };
 
+    const VEHICLE_PARAMS = {};
+
+    function applyVehiclePreset(profile) {
+        Object.assign(VEHICLE_PARAMS, VEHICLE_CONFIGS[profile]);
+        document.getElementById('track-width-slider').value = VEHICLE_PARAMS.TRACK_WIDTH;
+        document.getElementById('track-width-display').innerText = VEHICLE_PARAMS.TRACK_WIDTH.toFixed(1);
+    }
+    
+    applyVehiclePreset(SETTINGS.physicsProfile);
+
+    const TERRAIN = { SEGMENT_LEN: 100, DENSITY: 1.2 };
     const clamp = (val, min, max) => Math.max(min, Math.min(val, max));
 
     // --- GLOBALS ---
@@ -66,7 +84,6 @@ window.addEventListener('load', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            
             if (document.fullscreenElement || document.webkitFullscreenElement) {
                 document.body.classList.add('mobile-mode');
             } else {
@@ -77,7 +94,6 @@ window.addEventListener('load', () => {
         window.addEventListener('resize', handleResize);
         window.addEventListener('fullscreenchange', handleResize);
         window.addEventListener('webkitfullscreenchange', handleResize);
-        
         handleResize();
     }
 
@@ -116,32 +132,22 @@ window.addEventListener('load', () => {
             this.container.add(this.cloudGroup);
 
             this.colors = {
-                daySky: new THREE.Color(0x87CEEB),
-                noonSky: new THREE.Color(0x4CA1E3),
-                sunsetSky: new THREE.Color(0xFD5E53),
-                nightSky: new THREE.Color(0x0a0a15),
-                daySun: new THREE.Color(0xffffee),
-                sunsetSun: new THREE.Color(0xffaa00)
+                daySky: new THREE.Color(0x87CEEB), noonSky: new THREE.Color(0x4CA1E3), sunsetSky: new THREE.Color(0xFD5E53),
+                nightSky: new THREE.Color(0x0a0a15), daySun: new THREE.Color(0xffffee), sunsetSun: new THREE.Color(0xffaa00)
             };
         }
 
         createStars() {
             const geo = new THREE.BufferGeometry();
             const pos = [];
-            for(let i=0; i<1000; i++) {
-                pos.push((Math.random()-0.5)*400, (Math.random()-0.5)*200 + 50, (Math.random()-0.5)*100 - 50);
-            }
+            for(let i=0; i<1000; i++) pos.push((Math.random()-0.5)*400, (Math.random()-0.5)*200 + 50, (Math.random()-0.5)*100 - 50);
             geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-            const mat = new THREE.PointsMaterial({color: 0xffffff, size: 0.7, transparent: true, opacity: 0});
-            return new THREE.Points(geo, mat);
+            return new THREE.Points(geo, new THREE.PointsMaterial({color: 0xffffff, size: 0.7, transparent: true, opacity: 0}));
         }
 
         createClouds() {
             const geo = new THREE.DodecahedronGeometry(1, 0);
-            const mat = new THREE.MeshStandardMaterial({ 
-                color: 0xffffff, roughness: 0.9, flatShading: true, transparent: true, opacity: 0.8 
-            });
-            
+            const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, flatShading: true, transparent: true, opacity: 0.8 });
             for(let i=0; i<15; i++) {
                 const mesh = new THREE.Mesh(geo, mat);
                 const scale = 2 + Math.random() * 4;
@@ -154,7 +160,6 @@ window.addEventListener('load', () => {
         }
 
         update(dt, carPos) {
-            
             if (vehicle && vehicle.headlights) {
                 const lightsOn = (SETTINGS.graphics === 'modern');
                 vehicle.headlights.forEach(l => l.visible = lightsOn);
@@ -162,115 +167,63 @@ window.addEventListener('load', () => {
 
             if (SETTINGS.graphics === 'basic') {
                 renderer.shadowMap.enabled = false;
-                this.sunLight.intensity = 0.8; 
-                this.sunLight.castShadow = false;
+                this.sunLight.intensity = 0.8; this.sunLight.castShadow = false;
                 this.sunLight.position.set(carPos.x + 20, 50, 30);
-                this.sunLight.target.position.set(carPos.x, 0, 0);
-                this.sunLight.target.updateMatrixWorld();
-                
-                this.hemiLight.color.setHex(0xffffff);
-                this.hemiLight.groundColor.setHex(0xaaaaaa); 
-                this.hemiLight.intensity = 0.8; 
-
-                scene.background = new THREE.Color(0x6495ED); 
-                scene.fog = null;
-
-                this.starField.visible = false;
-                this.cloudGroup.visible = false;
-                this.moonMesh.visible = false;
+                this.sunLight.target.position.set(carPos.x, 0, 0); this.sunLight.target.updateMatrixWorld();
+                this.hemiLight.color.setHex(0xffffff); this.hemiLight.groundColor.setHex(0xaaaaaa); this.hemiLight.intensity = 0.8; 
+                scene.background = new THREE.Color(0x6495ED); scene.fog = null;
+                this.starField.visible = false; this.cloudGroup.visible = false; this.moonMesh.visible = false;
                 document.getElementById('time-display').innerText = "--:--";
                 return;
             }
 
             if (SETTINGS.graphics === 'classic') {
-                renderer.shadowMap.enabled = true;
-                this.sunLight.castShadow = true;
-                
-                this.sunLight.intensity = 1.2;
-                this.sunLight.color.setHex(0xffffee);
+                renderer.shadowMap.enabled = true; this.sunLight.castShadow = true;
+                this.sunLight.intensity = 1.2; this.sunLight.color.setHex(0xffffee);
                 this.sunLight.position.set(carPos.x + 50, 60, 20);
-                this.sunLight.target.position.set(carPos.x, 0, 0);
-                this.sunLight.target.updateMatrixWorld();
-
-                this.hemiLight.color.setHex(0xffffff);
-                this.hemiLight.groundColor.setHex(0x444444);
-                this.hemiLight.intensity = 0.6;
-
-                scene.background = this.colors.daySky;
-                scene.fog = new THREE.Fog(this.colors.daySky, 30, 90);
-
-                this.starField.visible = false;
-                this.cloudGroup.visible = false;
-                this.moonMesh.visible = false;
+                this.sunLight.target.position.set(carPos.x, 0, 0); this.sunLight.target.updateMatrixWorld();
+                this.hemiLight.color.setHex(0xffffff); this.hemiLight.groundColor.setHex(0x444444); this.hemiLight.intensity = 0.6;
+                scene.background = this.colors.daySky; scene.fog = new THREE.Fog(this.colors.daySky, 30, 90);
+                this.starField.visible = false; this.cloudGroup.visible = false; this.moonMesh.visible = false;
                 document.getElementById('time-display').innerText = "12:00";
                 return;
             }
 
-            // Modern Mode
-            renderer.shadowMap.enabled = true;
-            this.sunLight.castShadow = true;
-            this.cloudGroup.visible = true;
-            this.starField.visible = true;
-            this.moonMesh.visible = true;
-            this.hemiLight.groundColor.setHex(0x444444);
-            this.hemiLight.color.setHex(0xffffff);
+            renderer.shadowMap.enabled = true; this.sunLight.castShadow = true;
+            this.cloudGroup.visible = true; this.starField.visible = true; this.moonMesh.visible = true;
             
             gameState.timeOfDay = (gameState.timeOfDay + dt / SETTINGS.dayCycleDuration) % 1;
-            
-            const t = gameState.timeOfDay;
-            const angle = (t * Math.PI * 2) + (Math.PI / 2); 
-            const dist = 60;
-            
-            const sunX = Math.cos(angle) * dist;
-            const sunY = Math.sin(angle) * dist;
+            const t = gameState.timeOfDay, angle = (t * Math.PI * 2) + (Math.PI / 2), dist = 60;
+            const sunX = Math.cos(angle) * dist, sunY = Math.sin(angle) * dist;
             
             this.sunLight.position.set(carPos.x + sunX, sunY, 20);
-            this.sunLight.target.position.set(carPos.x, 0, 0);
-            this.sunLight.target.updateMatrixWorld();
+            this.sunLight.target.position.set(carPos.x, 0, 0); this.sunLight.target.updateMatrixWorld();
+            this.moonMesh.position.set(carPos.x - sunX, -sunY, -30); this.moonMesh.lookAt(carPos.x, 0, 0);
 
-            this.moonMesh.position.set(carPos.x - sunX, -sunY, -30);
-            this.moonMesh.lookAt(carPos.x, 0, 0);
-
-            let skyColor = this.colors.daySky.clone();
-            let sunInt = 1.2;
-            let starOp = 0;
-
+            let skyColor = this.colors.daySky.clone(), sunInt = 1.2, starOp = 0;
             if (t > 0.2 && t < 0.3) { 
                 const k = (t - 0.2) * 10;
                 skyColor.lerp(this.colors.sunsetSky, k < 0.5 ? k*2 : (1-k)*2);
-                this.sunLight.color.lerp(this.colors.sunsetSun, k);
-                sunInt = 1.2 - k;
+                this.sunLight.color.lerp(this.colors.sunsetSun, k); sunInt = 1.2 - k;
             } else if (t >= 0.3 && t < 0.7) { 
-                skyColor = this.colors.nightSky;
-                sunInt = 0; 
-                starOp = 1;
+                skyColor = this.colors.nightSky; sunInt = 0; starOp = 1;
                 this.sunLight.color.setHex(0xaaaaaa);
                 if(t > 0.35 && t < 0.65) sunInt = 0.2; 
             } else if (t >= 0.7 && t < 0.8) { 
-                skyColor.lerp(this.colors.sunsetSky, 0.5); 
-                sunInt = (t-0.7)*10;
-                starOp = 1 - (t-0.7)*10;
-            } else {
-                this.sunLight.color.setHex(0xffffee);
-            }
+                skyColor.lerp(this.colors.sunsetSky, 0.5); sunInt = (t-0.7)*10; starOp = 1 - (t-0.7)*10;
+            } else { this.sunLight.color.setHex(0xffffee); }
 
-            scene.background = skyColor;
-            scene.fog = new THREE.Fog(skyColor, 20, 100);
-            
-            this.sunLight.intensity = sunInt;
-            this.starField.material.opacity = starOp;
-            this.starField.position.x = carPos.x;
+            scene.background = skyColor; scene.fog = new THREE.Fog(skyColor, 20, 100);
+            this.sunLight.intensity = sunInt; this.starField.material.opacity = starOp; this.starField.position.x = carPos.x;
 
             this.clouds.forEach(c => {
                 c.position.x += c.userData.speed * dt;
                 if (c.position.x > carPos.x + 100) c.position.x -= 200;
                 if (c.position.x < carPos.x - 100) c.position.x += 200;
-                const cloudBri = t > 0.3 && t < 0.7 ? 0.2 : 1.0;
-                c.material.color.setScalar(cloudBri);
+                c.material.color.setScalar(t > 0.3 && t < 0.7 ? 0.2 : 1.0);
             });
             
-            const hours = Math.floor(t * 24);
-            const mins = Math.floor((t * 24 * 60) % 60);
+            const hours = Math.floor(t * 24), mins = Math.floor((t * 24 * 60) % 60);
             document.getElementById('time-display').innerText = `${hours.toString().padStart(2,'0')}:${mins.toString().padStart(2,'0')}`;
         }
     }
@@ -287,9 +240,7 @@ window.addEventListener('load', () => {
         const dA = getData(contact.getFixtureA()), dB = getData(contact.getFixtureB());
         if(!dA || !dB) return;
         
-        const checkGround = (w, g) => {
-            if (w.type === 'wheel' && g.type === 'ground') w.owner.setGrounded(w.wheelId, isBeginning);
-        };
+        const checkGround = (w, g) => { if (w.type === 'wheel' && g.type === 'ground') w.owner.setGrounded(w.wheelId, isBeginning); };
         checkGround(dA, dB); checkGround(dB, dA);
 
         if (isBeginning) {
@@ -305,8 +256,7 @@ window.addEventListener('load', () => {
                     }
                 }
             };
-            checkCol(dA, dB, contact.getFixtureB());
-            checkCol(dB, dA, contact.getFixtureA());
+            checkCol(dA, dB, contact.getFixtureB()); checkCol(dB, dA, contact.getFixtureA());
         }
     }
 
@@ -317,19 +267,11 @@ window.addEventListener('load', () => {
 
     // --- INPUT & UI ---
     const input = {
-        throttle: 0, brake: 0, pitch: 0, keys: new Set(),
-        touchStates: { throttle: 0, brake: 0, pitch: 0 },
+        throttle: 0, brake: 0, pitch: 0, keys: new Set(), touchStates: { throttle: 0, brake: 0, pitch: 0 },
         
         init() {
-            const panels = {
-                help: document.getElementById('help-panel'),
-                options: document.getElementById('options-panel'),
-                gameover: document.getElementById('game-over-panel')
-            };
-            const toggle = (id) => {
-                Object.values(panels).forEach(p => p.classList.add('hidden'));
-                if(id) panels[id].classList.remove('hidden');
-            };
+            const panels = { help: document.getElementById('help-panel'), options: document.getElementById('options-panel'), gameover: document.getElementById('game-over-panel') };
+            const toggle = (id) => { Object.values(panels).forEach(p => p.classList.add('hidden')); if(id) panels[id].classList.remove('hidden'); };
 
             document.getElementById('help-toggle-button').onclick = () => toggle('help');
             document.getElementById('close-help-btn').onclick = () => toggle(null);
@@ -337,94 +279,75 @@ window.addEventListener('load', () => {
 
             const openOptions = () => {
                 if(!panels.options.classList.contains('hidden')) return;
-                
                 gameState.paused = true;
-                if(vehicle) {
-                    const pos = vehicle.chassis.getPosition();
-                    vehicle.reset(Vec2(pos.x, pos.y + 5));
-                }
+                if(vehicle) { const pos = vehicle.chassis.getPosition(); vehicle.reset(Vec2(pos.x, pos.y + 5)); }
                 toggle('options');
             };
-
-            const closeOptions = () => {
-                toggle(null);
-                gameState.paused = false;
-            };
+            const closeOptions = () => { toggle(null); gameState.paused = false; };
 
             document.getElementById('options-toggle-button').onclick = openOptions;
             document.getElementById('close-options-btn').onclick = closeOptions;
 
             document.getElementById('graphics-select').addEventListener('change', (e) => {
-                SETTINGS.graphics = e.target.value;
-                terrainManager.refreshGraphics();
+                SETTINGS.graphics = e.target.value; terrainManager.refreshGraphics();
             });
 
-            const zSlider = document.getElementById('zoom-slider');
-            zSlider.oninput = (e) => {
-                SETTINGS.cameraZoom = parseFloat(e.target.value);
-                document.getElementById('zoom-display').innerText = SETTINGS.cameraZoom;
+            document.getElementById('zoom-slider').oninput = (e) => {
+                SETTINGS.cameraZoom = parseFloat(e.target.value); document.getElementById('zoom-display').innerText = SETTINGS.cameraZoom;
             };
 
-            const physModeSelect = document.getElementById('physics-mode-select');
-            const suspSelect = document.getElementById('suspension-select');
-            const widthSlider = document.getElementById('track-width-slider');
-            const widthDisp = document.getElementById('track-width-display');
-            const hzSlider = document.getElementById('phys-hz-slider');
-            const iterSlider = document.getElementById('phys-iter-slider');
-            const hzDisp = document.getElementById('phys-hz-display');
-            const iterDisp = document.getElementById('phys-iter-display');
+            const rebuildVehicleWithState = () => {
+                if (!vehicle) return;
+                const pos = vehicle.chassis.getPosition().clone(), linVel = vehicle.chassis.getLinearVelocity().clone();
+                const angle = vehicle.chassis.getAngle(), angVel = vehicle.chassis.getAngularVelocity();
+                
+                vehicle.destroy();
+                vehicle = createVehicle(pos, angle);
+                
+                vehicle.chassis.setLinearVelocity(linVel); vehicle.chassis.setAngularVelocity(angVel);
+                vehicle.rear.setLinearVelocity(linVel); vehicle.front.setLinearVelocity(linVel);
+            };
 
-            suspSelect.addEventListener('change', (e) => {
-                SETTINGS.suspension = e.target.value;
+            document.getElementById('vehicle-select').addEventListener('change', (e) => {
+                SETTINGS.vehicleType = e.target.value;
+                rebuildVehicleWithState();
             });
 
+            document.getElementById('vehicle-physics-select').addEventListener('change', (e) => {
+                SETTINGS.physicsProfile = e.target.value;
+                applyVehiclePreset(SETTINGS.physicsProfile);
+                rebuildVehicleWithState();
+            });
+
+            const widthSlider = document.getElementById('track-width-slider');
+            const widthDisp = document.getElementById('track-width-display');
             widthSlider.addEventListener('input', (e) => {
                 const val = parseFloat(e.target.value);
                 widthDisp.innerText = val.toFixed(1);
                 VEHICLE_PARAMS.TRACK_WIDTH = val;
-
-                if (vehicle) {
-                    const pos = vehicle.chassis.getPosition().clone();
-                    const linVel = vehicle.chassis.getLinearVelocity().clone();
-                    const angle = vehicle.chassis.getAngle(); 
-                    const angVel = vehicle.chassis.getAngularVelocity();
-
-                    vehicle.destroy();
-                    vehicle = createVehicle(pos, angle);
-                    
-                    vehicle.chassis.setLinearVelocity(linVel);
-                    vehicle.chassis.setAngularVelocity(angVel);
-                    vehicle.rear.setLinearVelocity(linVel);
-                    vehicle.front.setLinearVelocity(linVel);
-                }
+                rebuildVehicleWithState();
             });
+
+            document.getElementById('suspension-select').addEventListener('change', (e) => SETTINGS.suspension = e.target.value);
+            
+            const hzSlider = document.getElementById('phys-hz-slider'), iterSlider = document.getElementById('phys-iter-slider');
+            const hzDisp = document.getElementById('phys-hz-display'), iterDisp = document.getElementById('phys-iter-display');
+            const physModeSelect = document.getElementById('physics-mode-select');
 
             const applyPhysPreset = (mode) => {
                 if(mode === 'custom') return;
                 const p = PHYSICS_PRESETS[mode];
-                SETTINGS.physicsHz = p.hz;
-                SETTINGS.physicsIter = p.iter;
-                
-                hzSlider.value = p.hz;
-                iterSlider.value = p.iter;
-                hzDisp.innerText = p.hz;
-                iterDisp.innerText = p.iter;
+                SETTINGS.physicsHz = p.hz; SETTINGS.physicsIter = p.iter;
+                hzSlider.value = p.hz; iterSlider.value = p.iter; hzDisp.innerText = p.hz; iterDisp.innerText = p.iter;
             };
 
-            physModeSelect.addEventListener('change', (e) => {
-                applyPhysPreset(e.target.value);
-            });
+            physModeSelect.addEventListener('change', (e) => applyPhysPreset(e.target.value));
 
             const onManualPhysChange = () => {
-                physModeSelect.value = 'custom';
-                SETTINGS.physicsHz = parseInt(hzSlider.value);
-                SETTINGS.physicsIter = parseInt(iterSlider.value);
-                hzDisp.innerText = SETTINGS.physicsHz;
-                iterDisp.innerText = SETTINGS.physicsIter;
+                physModeSelect.value = 'custom'; SETTINGS.physicsHz = parseInt(hzSlider.value); SETTINGS.physicsIter = parseInt(iterSlider.value);
+                hzDisp.innerText = SETTINGS.physicsHz; iterDisp.innerText = SETTINGS.physicsIter;
             };
-
-            hzSlider.addEventListener('input', onManualPhysChange);
-            iterSlider.addEventListener('input', onManualPhysChange);
+            hzSlider.addEventListener('input', onManualPhysChange); iterSlider.addEventListener('input', onManualPhysChange);
 
             window.addEventListener('keydown', e => this.keys.add(e.code));
             window.addEventListener('keyup', e => {
@@ -433,145 +356,75 @@ window.addEventListener('load', () => {
                 if (e.code === 'Space') gameState.paused = !gameState.paused;
                 if (e.code === 'KeyD') { gameState.debug = !gameState.debug; }
                 if (e.code === 'KeyH') toggle('help');
-                if (e.code === 'KeyO') {
-                    if(panels.options.classList.contains('hidden')) {
-                        openOptions();
-                    } else {
-                        closeOptions();
-                    }
-                }
+                if (e.code === 'KeyO') { if(panels.options.classList.contains('hidden')) openOptions(); else closeOptions(); }
             });
 
-            const mobileBtn = document.getElementById('mobile-btn');
-            if (mobileBtn) {
-                mobileBtn.addEventListener('click', () => {
-                    const el = document.documentElement;
-                    if (el.requestFullscreen) el.requestFullscreen();
-                    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-                });
-            }
-
             const touchBtn = (id, setter) => {
-                const el = document.getElementById(id);
-                const h = (s) => (e) => { 
-                    if(e.cancelable) e.preventDefault(); 
-                    setter(s); 
-                };
+                const el = document.getElementById(id), h = (s) => (e) => { if(e.cancelable) e.preventDefault(); setter(s); };
                 if(el) { 
-                    el.addEventListener('touchstart', h(1), { passive: false });
-                    el.addEventListener('touchend', h(0), { passive: false });
-                    el.addEventListener('touchcancel', h(0), { passive: false });
-                    
-                    el.addEventListener('mousedown', h(1));
-                    el.addEventListener('mouseup', h(0));
-                    el.addEventListener('mouseleave', (e) => { if (e.buttons === 1) h(0)(e); });
+                    el.addEventListener('touchstart', h(1), { passive: false }); el.addEventListener('touchend', h(0), { passive: false });
+                    el.addEventListener('mousedown', h(1)); el.addEventListener('mouseup', h(0)); el.addEventListener('mouseleave', (e) => { if (e.buttons === 1) h(0)(e); });
                 }
             };
-            
-            touchBtn('throttle-btn', v => this.touchStates.throttle = v);
-            touchBtn('brake-btn', v => this.touchStates.brake = v);
-            touchBtn('tilt-forward-btn', v => this.touchStates.pitch = v);
-            touchBtn('tilt-backward-btn', v => this.touchStates.pitch = -v);
+            touchBtn('throttle-btn', v => this.touchStates.throttle = v); touchBtn('brake-btn', v => this.touchStates.brake = v);
+            touchBtn('tilt-forward-btn', v => this.touchStates.pitch = v); touchBtn('tilt-backward-btn', v => this.touchStates.pitch = -v);
+
+            document.getElementById('mobile-btn')?.addEventListener('click', () => {
+                const el = document.documentElement; if (el.requestFullscreen) el.requestFullscreen(); else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+            });
         },
 
         update() {
-            const keyThrottle = this.keys.has('ArrowUp') ? 1 : 0;
-            const keyBrake = this.keys.has('ArrowDown') ? 1 : 0;
+            const keyThrottle = this.keys.has('ArrowUp') ? 1 : 0, keyBrake = this.keys.has('ArrowDown') ? 1 : 0;
             const keyPitch = (this.keys.has('ArrowRight') ? 1 : 0) - (this.keys.has('ArrowLeft') ? 1 : 0);
-
             this.throttle = Math.max(keyThrottle, this.touchStates.throttle);
             this.brake = Math.max(keyBrake, this.touchStates.brake);
             this.pitch = keyPitch !== 0 ? keyPitch : this.touchStates.pitch;
         },
 
         handleReset() {
-            if (gameState.lastCheckpoint) {
-                vehicle.reset(gameState.lastCheckpoint.pos);
-                gameState.fuel = Math.max(50, gameState.fuel);
-            } else {
-                vehicle.reset(Vec2(0, 5));
-                gameState.fuel = 100;
-                gameState.distance = 0;
-                gameState.timeOfDay = 0;
-            }
-            gameState.gameOver = false;
-            document.getElementById('game-over-panel').classList.add('hidden');
+            if (gameState.lastCheckpoint) { vehicle.reset(gameState.lastCheckpoint.pos); gameState.fuel = Math.max(50, gameState.fuel); } 
+            else { vehicle.reset(Vec2(0, 5)); gameState.fuel = 100; gameState.distance = 0; gameState.timeOfDay = 0; }
+            gameState.gameOver = false; document.getElementById('game-over-panel').classList.add('hidden');
         }
     };
 
     // --- TERRAIN & VEGETATION ---
     function createTerrainManager() {
-        let segments = [], lastGenX = -TERRAIN.SEGMENT_LEN;
-        let lastChk = 0, lastFuel = 0;
-        
-        const seed = Math.random() * 1000;
-        const A1 = 0.8, F1 = 0.4, A2 = 0.3, F2 = 1.2;
+        let segments = [], lastGenX = -TERRAIN.SEGMENT_LEN, lastChk = 0, lastFuel = 0;
+        const seed = Math.random() * 1000, A1 = 0.8, F1 = 0.4, A2 = 0.3, F2 = 1.2;
         const heightFn = x => A1 * Math.sin(F1 * x + seed) + A2 * Math.sin(F2 * x + seed + 100);
 
         const createGrass = (pathPoints) => {
-            const count = 100;
-            const geo = new THREE.PlaneGeometry(0.5, 0.8);
-            geo.translate(0, 0.4, 0); 
+            const count = 100, geo = new THREE.PlaneGeometry(0.5, 0.8); geo.translate(0, 0.4, 0); 
             const mat = new THREE.MeshStandardMaterial({ color: 0x4caf50, side: THREE.DoubleSide, transparent: true });
-            const mesh = new THREE.InstancedMesh(geo, mat, count);
-            const dummy = new THREE.Object3D();
-
+            const mesh = new THREE.InstancedMesh(geo, mat, count); const dummy = new THREE.Object3D();
             for (let i = 0; i < count; i++) {
-                const idx = Math.floor(Math.random() * (pathPoints.length - 1));
-                const p1 = pathPoints[idx], p2 = pathPoints[idx+1];
-                const alpha = Math.random();
-                const x = p1.x + (p2.x - p1.x) * alpha;
-                const y = p1.y + (p2.y - p1.y) * alpha;
-                
-                dummy.position.set(x, y, (Math.random()-0.5) * 5); 
-                dummy.rotation.y = Math.random() * Math.PI;
-                dummy.scale.setScalar(0.8 + Math.random() * 0.5);
-                dummy.updateMatrix();
-                mesh.setMatrixAt(i, dummy.matrix);
+                const idx = Math.floor(Math.random() * (pathPoints.length - 1)), p1 = pathPoints[idx], p2 = pathPoints[idx+1], alpha = Math.random();
+                dummy.position.set(p1.x + (p2.x - p1.x) * alpha, p1.y + (p2.y - p1.y) * alpha, (Math.random()-0.5) * 5); 
+                dummy.rotation.y = Math.random() * Math.PI; dummy.scale.setScalar(0.8 + Math.random() * 0.5); dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix);
             }
-            mesh.receiveShadow = true;
-            return mesh;
+            mesh.receiveShadow = true; return mesh;
         };
 
         const generateSegment = (startX) => {
-            const points = [], vPoints = [], topPath = [];
-            let lastY = heightFn(startX);
-            
-            points.push(Vec2(startX, lastY));
-            vPoints.push(new THREE.Vector2(startX, lastY));
-            topPath.push({x: startX, y: lastY});
+            const points = [], vPoints = [], topPath = []; let lastY = heightFn(startX);
+            points.push(Vec2(startX, lastY)); vPoints.push(new THREE.Vector2(startX, lastY)); topPath.push({x: startX, y: lastY});
 
             for (let x = startX + TERRAIN.DENSITY; x <= startX + TERRAIN.SEGMENT_LEN; x += TERRAIN.DENSITY) {
-                let y = heightFn(x);
-                const slope = (y - lastY) / TERRAIN.DENSITY;
+                let y = heightFn(x); const slope = (y - lastY) / TERRAIN.DENSITY;
                 if (Math.abs(slope) > 0.8) y = lastY + Math.sign(slope) * 0.8 * TERRAIN.DENSITY;
-                
-                points.push(Vec2(x, y));
-                vPoints.push(new THREE.Vector2(x, y));
-                topPath.push({x: x, y: y});
-                lastY = y;
+                points.push(Vec2(x, y)); vPoints.push(new THREE.Vector2(x, y)); topPath.push({x: x, y: y}); lastY = y;
             }
             
-            const body = world.createBody(Vec2.zero());
-            body.createFixture(pl.Chain(points, false), { friction: 0.9, userData: { type: 'ground' } });
-            
-            vPoints.push(new THREE.Vector2(vPoints[vPoints.length-1].x, -30));
-            vPoints.push(new THREE.Vector2(startX, -30));
-            const shape = new THREE.Shape(vPoints);
-            const geo = new THREE.ExtrudeGeometry(shape, { depth: 20, bevelEnabled: false });
-            geo.translate(0, 0, -10);
-            const mat = new THREE.MeshStandardMaterial({ color: 0x3d2e1e, roughness: 0.9 });
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.receiveShadow = true;
-            scene.add(mesh);
+            const body = world.createBody(Vec2.zero()); body.createFixture(pl.Chain(points, false), { friction: 0.9, userData: { type: 'ground' } });
+            vPoints.push(new THREE.Vector2(vPoints[vPoints.length-1].x, -30)); vPoints.push(new THREE.Vector2(startX, -30));
+            const geo = new THREE.ExtrudeGeometry(new THREE.Shape(vPoints), { depth: 20, bevelEnabled: false }); geo.translate(0, 0, -10);
+            const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x3d2e1e, roughness: 0.9 }));
+            mesh.receiveShadow = true; scene.add(mesh);
 
-            const grass = createGrass(topPath);
-            grass.visible = (SETTINGS.graphics === 'modern');
-            scene.add(grass);
-
-            body.setUserData({ mesh, grass, type: 'ground' });
-            segments.push({ body, endX: startX + TERRAIN.SEGMENT_LEN, grass });
-            lastGenX = startX + TERRAIN.SEGMENT_LEN;
+            const grass = createGrass(topPath); grass.visible = (SETTINGS.graphics === 'modern'); scene.add(grass);
+            body.setUserData({ mesh, grass, type: 'ground' }); segments.push({ body, endX: startX + TERRAIN.SEGMENT_LEN, grass }); lastGenX = startX + TERRAIN.SEGMENT_LEN;
 
             for(let i=1; i<topPath.length-1; i++) {
                 if(topPath[i].x > lastChk + 150) { createItem(topPath[i].x, topPath[i].y+1.5, 'checkpoint'); lastChk=topPath[i].x; }
@@ -582,18 +435,10 @@ window.addEventListener('load', () => {
         function createItem(x, y, type) {
             const body = world.createBody({ type: 'static', position: Vec2(x, y) });
             body.createFixture(pl.Box(0.5, 0.5), { isSensor: true, userData: { type } });
-            
-            const mat = type === 'checkpoint' 
-                ? new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xffaa00, emissiveIntensity: 0.5 }) 
-                : new THREE.MeshStandardMaterial({ color: 0xff0000 });
-            
+            const mat = type === 'checkpoint' ? new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xffaa00, emissiveIntensity: 0.5 }) : new THREE.MeshStandardMaterial({ color: 0xff0000 });
             const geo = type === 'checkpoint' ? new THREE.CylinderGeometry(0.2, 0.2, 3, 8) : new THREE.BoxGeometry(0.8, 0.8, 0.8);
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.position.set(x, y, 0);
-            mesh.userData = { originalY: y, floatOffset: Math.random() * 10 };
-            
-            scene.add(mesh);
-            body.setUserData({ mesh, type });
+            const mesh = new THREE.Mesh(geo, mat); mesh.position.set(x, y, 0); mesh.userData = { originalY: y, floatOffset: Math.random() * 10 };
+            scene.add(mesh); body.setUserData({ mesh, type });
         }
 
         return {
@@ -601,162 +446,175 @@ window.addEventListener('load', () => {
             update(camX) {
                 if (camX > lastGenX - 200) generateSegment(lastGenX);
                 if (segments.length > 0 && camX > segments[0].endX + 150) {
-                    const s = segments.shift();
-                    scene.remove(s.body.getUserData().mesh);
-                    if(s.grass) scene.remove(s.grass);
-                    world.destroyBody(s.body);
+                    const s = segments.shift(); scene.remove(s.body.getUserData().mesh); if(s.grass) scene.remove(s.grass); world.destroyBody(s.body);
                 }
             },
-            refreshGraphics() {
-                const isModern = SETTINGS.graphics === 'modern';
-                segments.forEach(s => { if(s.grass) s.grass.visible = isModern; });
-            }
+            refreshGraphics() { const m = SETTINGS.graphics === 'modern'; segments.forEach(s => { if(s.grass) s.grass.visible = m; }); }
         };
     }
 
     // --- VEHICLE FACTORY ---
     function createVehicle(pos, angle = 0) {
         const vp = VEHICLE_PARAMS;
-
+        const visType = SETTINGS.vehicleType;
+        const physType = SETTINGS.physicsProfile;
+        
         const chassis = world.createDynamicBody({ position: pos, angularDamping: 0.1 });
-        const density = vp.CHASSIS_MASS / 3.0; 
-        
-        const vertices = [
-            Vec2(-1.2, -0.3), 
-            Vec2(1.3, -0.3),  
-            Vec2(1.3, 0.2),   
-            Vec2(0.6, 0.4),   
-            Vec2(-0.8, 0.4),  
-            Vec2(-1.2, 0.2)   
-        ];
-        
-        chassis.createFixture(pl.Polygon(vertices), { density, filterGroupIndex: -1 });
-        chassis.setUserData({ type: 'chassis' });
+        const chassisGroup = new THREE.Group();
+        let frontArmObj = null, rearArmObj = null, headlights = [];
 
+        // Hitbox generated to match visual type to prevent ground clipping
+        let vertices;
+        if (visType === 'car') {
+            vertices = [ Vec2(-1.2, -0.3), Vec2(1.3, -0.3), Vec2(1.3, 0.2), Vec2(0.6, 0.4), Vec2(-0.8, 0.4), Vec2(-1.2, 0.2) ];
+        } else {
+            vertices = [ Vec2(-0.6, -0.5), Vec2(0.6, -0.5), Vec2(0.5, 0.4), Vec2(-0.1, 1.2), Vec2(-0.5, 0.6) ];
+        }
+        
+        // Physics logic (mass/density) applied from Physics Profile
+        chassis.createFixture(pl.Polygon(vertices), { density: vp.CHASSIS_DENSITY, filterGroupIndex: -1 });
+
+        // Build Visuals based on Visual Type
+        if (visType === 'car') {
+            const carShape = new THREE.Shape();
+            const drawRW = -vp.TRACK_WIDTH/2, drawFW = vp.TRACK_WIDTH/2;
+            carShape.moveTo(-1.3, -0.3); 
+            carShape.lineTo(drawRW - 0.55, -0.3); carShape.lineTo(drawRW - 0.35, -0.05); carShape.lineTo(drawRW + 0.35, -0.05); carShape.lineTo(drawRW + 0.55, -0.3);  
+            carShape.lineTo(drawFW - 0.55, -0.3); carShape.lineTo(drawFW - 0.35, -0.05); carShape.lineTo(drawFW + 0.35, -0.05); carShape.lineTo(drawFW + 0.55, -0.3);
+            carShape.lineTo(1.4, -0.3); carShape.lineTo(1.4, 0.1); carShape.lineTo(0.7, 0.25); carShape.lineTo(0.3, 0.6);
+            carShape.lineTo(-0.7, 0.6); carShape.lineTo(-1.1, 0.3); carShape.lineTo(-1.3, 0.3); carShape.lineTo(-1.3, -0.3);
+
+            const carGeo = new THREE.ExtrudeGeometry(carShape, { depth: 1.0, bevelEnabled: true, bevelSegments: 0, steps: 1, bevelSize: 0.05, bevelThickness: 0.05 });
+            carGeo.translate(0, 0, -0.5);
+            const carMesh = new THREE.Mesh(carGeo, new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.3, metalness: 0.5 }));
+            carMesh.castShadow = true;
+
+            const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.35, 0.95), new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.1, metalness: 0.9 }));
+            cabin.position.set(-0.2, 0.4, 0);
+            
+            const lightL = new THREE.PointLight(0xffffaa, 1, 10); lightL.position.set(1.4, 0, 0.3);
+            const lightR = new THREE.PointLight(0xffffaa, 1, 10); lightR.position.set(1.4, 0, -0.3);
+            headlights.push(lightL, lightR);
+            const hlMat = new THREE.MeshBasicMaterial({ color: 0xffffaa });
+            const hlL = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.2), hlMat); hlL.position.copy(lightL.position);
+            const hlR = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.2), hlMat); hlR.position.copy(lightR.position);
+
+            chassisGroup.add(carMesh, cabin, lightL, lightR, hlL, hlR);
+        } else {
+            // Moto Visuals
+            const addMesh = (geo, color, x, y, z, rotZ) => {
+                const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color, roughness:0.7, metalness:0.3}));
+                mesh.position.set(x, y, z); mesh.rotation.z = rotZ || 0; mesh.castShadow = true;
+                chassisGroup.add(mesh); return mesh;
+            };
+
+            // Bike Frame and Rider Body Blocks
+            addMesh(new THREE.BoxGeometry(0.8, 0.15, 0.25), 0xaaaaaa,  0.1, -0.1,  0, Math.PI/6);   
+            addMesh(new THREE.BoxGeometry(0.4, 0.3, 0.3),   0x333333,  0,   -0.3,  0, 0);           
+            addMesh(new THREE.BoxGeometry(0.5, 0.1, 0.26),  0x111111, -0.2,  0.15, 0, Math.PI/12);  
+            addMesh(new THREE.BoxGeometry(0.3, 0.2, 0.3),   0x11aa22,  0.25, 0.15, 0, -Math.PI/12); 
+            
+            // Rider (Slim silhouette)
+            addMesh(new THREE.BoxGeometry(0.3, 0.5, 0.35),  0x2244aa, -0.1,  0.5,  0, -Math.PI/8);  
+            addMesh(new THREE.BoxGeometry(0.25, 0.25, 0.25),0xeeeeee,  0.05, 0.9,  0, 0);           
+            addMesh(new THREE.BoxGeometry(0.26, 0.1, 0.2),  0x111111,  0.07, 0.9,  0, 0);           
+            
+            // Rider Limbs
+            addMesh(new THREE.BoxGeometry(0.15, 0.4, 0.15), 0x2244aa, -0.2,  0.15,  0.2, -Math.PI/6); 
+            addMesh(new THREE.BoxGeometry(0.15, 0.4, 0.15), 0x2244aa, -0.2,  0.15, -0.2, -Math.PI/6); 
+            addMesh(new THREE.BoxGeometry(0.12, 0.4, 0.12), 0x111111, -0.1, -0.15,  0.2, 0);          
+            addMesh(new THREE.BoxGeometry(0.12, 0.4, 0.12), 0x111111, -0.1, -0.15, -0.2, 0);          
+            
+            addMesh(new THREE.BoxGeometry(0.12, 0.35, 0.12),0x2244aa,  0,    0.6,   0.22,-Math.PI/4); 
+            addMesh(new THREE.BoxGeometry(0.12, 0.35, 0.12),0x2244aa,  0,    0.6,  -0.22,-Math.PI/4); 
+            addMesh(new THREE.BoxGeometry(0.1,  0.35, 0.1), 0x2244aa,  0.25, 0.45,  0.22,-Math.PI/2.5); 
+            addMesh(new THREE.BoxGeometry(0.1,  0.35, 0.1), 0x2244aa,  0.25, 0.45, -0.22,-Math.PI/2.5); 
+
+            // Headlight
+            const light = new THREE.PointLight(0xffffaa, 1, 15); light.position.set(0.55, 0.25, 0);
+            const hlMesh = addMesh(new THREE.BoxGeometry(0.1, 0.15, 0.2), 0xffffaa, 0.5, 0.25, 0, 0);
+            hlMesh.material = new THREE.MeshBasicMaterial({color: 0xffffaa});
+            headlights.push(light); chassisGroup.add(light);
+
+            // Dynamic Suspension Arms (Swingarm & Front Forks)
+            const createArm = (pivotX, pivotY, color, width) => {
+                const group = new THREE.Group(); group.position.set(pivotX, pivotY, 0);
+                const geo = new THREE.BoxGeometry(1, width, width); geo.translate(0.5, 0, 0); 
+                const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color, roughness:0.6}));
+                mesh.castShadow = true; group.add(mesh); chassisGroup.add(group);
+                return { group, mesh, pivotVec: {x: pivotX, y: pivotY} };
+            };
+            rearArmObj = createArm(-0.1, -0.3, 0xaaaaaa, 0.12);
+            frontArmObj = createArm(0.4, 0.2, 0xaaaaaa, 0.08);
+        }
+
+        scene.add(chassisGroup);
+        chassis.setUserData({ type: 'chassis', mesh: chassisGroup });
         chassis.setAngle(angle);
 
-        const chassisGroup = new THREE.Group();
-
-        const carShape = new THREE.Shape();
-        const drawRW = -1.7/2; 
-        const drawFW = 1.7/2;  
-        
-        carShape.moveTo(-1.3, -0.3); 
-        
-        carShape.lineTo(drawRW - 0.55, -0.3); 
-        carShape.lineTo(drawRW - 0.35, -0.05); 
-        carShape.lineTo(drawRW + 0.35, -0.05); 
-        carShape.lineTo(drawRW + 0.55, -0.3);  
-        
-        carShape.lineTo(drawFW - 0.55, -0.3);
-        
-        carShape.lineTo(drawFW - 0.55, -0.3);
-        carShape.lineTo(drawFW - 0.35, -0.05);
-        carShape.lineTo(drawFW + 0.35, -0.05);
-        carShape.lineTo(drawFW + 0.55, -0.3);
-        
-        carShape.lineTo(1.4, -0.3);
-        carShape.lineTo(1.4, 0.1); 
-        
-        carShape.lineTo(0.7, 0.25);
-        carShape.lineTo(0.3, 0.6);
-        carShape.lineTo(-0.7, 0.6);
-        carShape.lineTo(-1.1, 0.3);
-        carShape.lineTo(-1.3, 0.3);
-        carShape.lineTo(-1.3, -0.3);
-
-        const extrudeSettings = { 
-            depth: 1.0, 
-            bevelEnabled: true, 
-            bevelSegments: 0, 
-            steps: 1,         
-            bevelSize: 0.05, 
-            bevelThickness: 0.05 
-        };
-
-        const carGeo = new THREE.ExtrudeGeometry(carShape, extrudeSettings);
-        carGeo.translate(0, 0, -0.5);
-
-        const carMat = new THREE.MeshStandardMaterial({ 
-            color: 0xcc0000, 
-            roughness: 0.3, 
-            metalness: 0.5 
-        });
-        
-        const carMesh = new THREE.Mesh(carGeo, carMat);
-        carMesh.castShadow = true;
-
-        const windowMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.1, metalness: 0.9 });
-        const cabinGeo = new THREE.BoxGeometry(1.2, 0.35, 0.95);
-        const cabin = new THREE.Mesh(cabinGeo, windowMat);
-        cabin.position.set(-0.2, 0.4, 0);
-        
-        const lightL = new THREE.PointLight(0xffffaa, 1, 10); lightL.position.set(1.4, 0, 0.3); chassisGroup.add(lightL);
-        const lightR = new THREE.PointLight(0xffffaa, 1, 10); lightR.position.set(1.4, 0, -0.3); chassisGroup.add(lightR);
-        
-        const hlGeo = new THREE.BoxGeometry(0.1, 0.1, 0.2);
-        const hlMat = new THREE.MeshBasicMaterial({ color: 0xffffaa });
-        const hlL = new THREE.Mesh(hlGeo, hlMat); hlL.position.copy(lightL.position);
-        const hlR = new THREE.Mesh(hlGeo, hlMat); hlR.position.copy(lightR.position);
-
-        chassisGroup.add(carMesh, cabin, hlL, hlR);
-        scene.add(chassisGroup);
-        chassis.setUserData({ mesh: chassisGroup, type: 'chassis' });
-
-        const makeWheel = (xOffset, label) => {
-            const wheelBody = world.createDynamicBody({ position: chassis.getWorldPoint(Vec2(xOffset, -1)), angularDamping: 0.1 });
-            wheelBody.createFixture(pl.Circle(vp.WHEEL_RADIUS), { density: vp.WHEEL_MASS, friction: vp.WHEEL_FRICTION, restitution: 0, filterGroupIndex: -1, userData: { type: 'wheel', wheelId: label, owner: null } });
+        // Wheels
+        const makeWheel = (xOffset, isFront, label) => {
+            const anchorVec = Vec2(xOffset, -1);
+            const wheelBody = world.createDynamicBody({ position: chassis.getWorldPoint(anchorVec), angularDamping: 0.1 });
+            wheelBody.createFixture(pl.Circle(vp.WHEEL_RADIUS), { density: vp.WHEEL_MASS, friction: vp.WHEEL_FRICTION, restitution: vp.WHEEL_RESTITUTION, filterGroupIndex: -1, userData: { type: 'wheel', wheelId: label, owner: null } });
             
+            // Realistic raked front fork tied to physics profile so moped physics always clmbs well
+            let axisVec = Vec2(0, 1);
+            if (physType === 'moped' && isFront) { axisVec = Vec2(-0.25, 1); axisVec.normalize(); }
+
             const joint = world.createJoint(pl.WheelJoint({
                 motorSpeed: 0, enableMotor: false, maxMotorTorque: 0,
                 frequencyHz: vp.SUSPENSION_FREQ_HZ, dampingRatio: vp.SUSPENSION_DAMPING_RATIO,
                 collideConnected: false 
-            }, chassis, wheelBody, chassis.getWorldPoint(Vec2(xOffset, -1)), chassis.getWorldVector(Vec2(0, 1))));
+            }, chassis, wheelBody, chassis.getWorldPoint(anchorVec), chassis.getWorldVector(axisVec)));
 
-            const wGeo = new THREE.CylinderGeometry(vp.WHEEL_RADIUS, vp.WHEEL_RADIUS, 0.4, 16);
-            wGeo.rotateX(Math.PI / 2);
-            const wMesh = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({ color: 0x222222 }));
-            
-            const rim = new THREE.Mesh(new THREE.BoxGeometry(vp.WHEEL_RADIUS*1.5, 0.1, 0.45), new THREE.MeshStandardMaterial({color: 0x888888}));
-            wMesh.add(rim);
-            wMesh.castShadow = true;
-            scene.add(wMesh);
+            let wGeo, wMat, wMesh;
+            // Draw visually selected wheel
+            if (visType === 'car') {
+                wGeo = new THREE.CylinderGeometry(vp.WHEEL_RADIUS, vp.WHEEL_RADIUS, 0.4, 16); wGeo.rotateX(Math.PI / 2);
+                wMesh = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({ color: 0x222222 }));
+                wMesh.add(new THREE.Mesh(new THREE.BoxGeometry(vp.WHEEL_RADIUS*1.5, 0.1, 0.45), new THREE.MeshStandardMaterial({color: 0x888888})));
+            } else {
+                wGeo = new THREE.CylinderGeometry(vp.WHEEL_RADIUS, vp.WHEEL_RADIUS, 0.15, 24); wGeo.rotateX(Math.PI / 2);
+                wMesh = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({ color: 0x111111 }));
+                const rim = new THREE.Mesh(new THREE.CylinderGeometry(vp.WHEEL_RADIUS*0.8, vp.WHEEL_RADIUS*0.8, 0.16, 24).rotateX(Math.PI/2), new THREE.MeshStandardMaterial({color: 0x777777}));
+                wMesh.add(rim);
+                for(let i=0; i<3; i++) {
+                    const spoke = new THREE.Mesh(new THREE.BoxGeometry(vp.WHEEL_RADIUS*1.6, 0.17, 0.02), new THREE.MeshStandardMaterial({color:0xdddddd}));
+                    spoke.rotation.z = (Math.PI/3) * i; wMesh.add(spoke);
+                }
+            }
+            wMesh.castShadow = true; scene.add(wMesh);
             wheelBody.setUserData({ mesh: wMesh });
 
             return { body: wheelBody, joint: joint, mesh: wMesh };
         };
 
-        const rear = makeWheel(-vp.TRACK_WIDTH/2, 'rear');
-        const front = makeWheel(vp.TRACK_WIDTH/2, 'front');
+        const rear = makeWheel(-vp.TRACK_WIDTH/2, false, 'rear');
+        const front = makeWheel(vp.TRACK_WIDTH/2, true, 'front');
 
         const obj = {
             chassis, rear: rear.body, front: front.body, rJoint: rear.joint, fJoint: front.joint,
-            headlights: [lightL, lightR],
-            grounded: { rear: 0, front: 0 },
+            headlights, grounded: { rear: 0, front: 0 },
             setGrounded(id, val) { this.grounded[id] += val ? 1 : -1; },
+            
             destroy() {
-                scene.remove(this.chassis.getUserData().mesh);
-                scene.remove(this.rear.getUserData().mesh);
-                scene.remove(this.front.getUserData().mesh);
-                world.destroyBody(this.chassis);
-                world.destroyBody(this.rear);
-                world.destroyBody(this.front);
+                scene.remove(this.chassis.getUserData().mesh); scene.remove(this.rear.getUserData().mesh); scene.remove(this.front.getUserData().mesh);
+                world.destroyBody(this.chassis); world.destroyBody(this.rear); world.destroyBody(this.front);
             },
+            
             reset(pos) {
                 this.chassis.setPosition(pos); this.chassis.setAngle(0); this.chassis.setLinearVelocity(Vec2(0,0)); this.chassis.setAngularVelocity(0);
-                const rPos = chassis.getWorldPoint(Vec2(-vp.TRACK_WIDTH/2, -1));
-                const fPos = chassis.getWorldPoint(Vec2(vp.TRACK_WIDTH/2, -1));
+                const rPos = chassis.getWorldPoint(Vec2(-vp.TRACK_WIDTH/2, -1)), fPos = chassis.getWorldPoint(Vec2(vp.TRACK_WIDTH/2, -1));
                 this.rear.setPosition(rPos); this.rear.setLinearVelocity(Vec2(0,0)); this.rear.setAngularVelocity(0);
                 this.front.setPosition(fPos); this.front.setLinearVelocity(Vec2(0,0)); this.front.setAngularVelocity(0);
             },
+            
             update(dt, input) {
                 if (input.throttle) {
-                    this.rJoint.enableMotor(true);
-                    this.rJoint.setMotorSpeed(-input.throttle * vp.MOTOR_MAX_SPEED);
-                    this.rJoint.setMaxMotorTorque(vp.MOTOR_TORQUE);
+                    this.rJoint.enableMotor(true); this.rJoint.setMotorSpeed(-input.throttle * vp.MOTOR_MAX_SPEED); this.rJoint.setMaxMotorTorque(vp.MOTOR_TORQUE);
                 } else {
-                    this.rJoint.enableMotor(false);
-                    if (this.grounded.rear > 0) this.rear.applyTorque(-this.rear.getAngularVelocity() * 10, true);
+                    this.rJoint.enableMotor(false); if (this.grounded.rear > 0) this.rear.applyTorque(-this.rear.getAngularVelocity() * 10, true);
                 }
                 if (input.brake) {
                     this.rear.applyTorque(clamp(-this.rear.getAngularVelocity()*120, -vp.BRAKE_TORQUE, vp.BRAKE_TORQUE), true);
@@ -767,25 +625,27 @@ window.addEventListener('load', () => {
                 this.chassis.applyTorque(t, true);
 
                 if (SETTINGS.suspension === 'modern') {
-                    const joints = [this.rJoint, this.fJoint];
-                    for(let i=0; i<joints.length; i++) {
-                        const joint = joints[i];
+                    [this.rJoint, this.fJoint].forEach(joint => {
                         const translation = joint.getJointTranslation();
-                        
                         if (translation > 0) {
-                            const stiffFactor = 6000; 
-                            const forceMag = stiffFactor * Math.pow(translation, 3);
-                            
-                            const anchor = joint.getAnchorA();
-                            const force = Vec2(0, forceMag);
-                            
-                            const angle = this.chassis.getAngle();
-                            const rotForce = pl.Rot.mul(pl.Rot(angle), force);
-
-                            this.chassis.applyForce(rotForce, anchor, true);
+                            const forceMag = 6000 * Math.pow(translation, 3);
+                            const rotForce = pl.Rot.mul(pl.Rot(this.chassis.getAngle()), Vec2(0, forceMag));
+                            this.chassis.applyForce(rotForce, joint.getAnchorA(), true);
                         }
-                    }
+                    });
                 }
+            },
+            
+            updateVisuals() {
+                if (visType !== 'moped') return;
+                const updateArm = (armObj, wheelBody) => {
+                    const localP = this.chassis.getLocalPoint(wheelBody.getPosition());
+                    const dx = localP.x - armObj.pivotVec.x, dy = localP.y - armObj.pivotVec.y;
+                    armObj.group.rotation.z = Math.atan2(dy, dx);
+                    armObj.mesh.scale.set(Math.hypot(dx, dy), 1, 1);
+                };
+                if(rearArmObj) updateArm(rearArmObj, this.rear);
+                if(frontArmObj) updateArm(frontArmObj, this.front);
             }
         };
         
@@ -795,59 +655,45 @@ window.addEventListener('load', () => {
     }
 
     // --- MAIN LOOP ---
-    let lastTime = 0, accumulator = 0;
-    let lastUIUpdate = 0;
+    let lastTime = 0, accumulator = 0, lastUIUpdate = 0;
 
     function gameLoop(time) {
         requestAnimationFrame(gameLoop);
-        
-        let dt = (time - lastTime) / 1000;
-        lastTime = time;
-
-        if (dt > PHYS_CONST.MAX_FRAME_TIME) dt = PHYS_CONST.MAX_FRAME_TIME;
+        let dt = Math.min((time - lastTime) / 1000, PHYS_CONST.MAX_FRAME_TIME); lastTime = time;
 
         if (!gameState.paused) {
             input.update();
             const physicsStepSize = 1 / SETTINGS.physicsHz;
             accumulator += dt;
-            const maxSteps = 5; 
             let steps = 0;
 
-            while (accumulator >= physicsStepSize && steps < maxSteps) {
+            while (accumulator >= physicsStepSize && steps < 5) {
                 vehicle.update(physicsStepSize, input);
                 world.step(physicsStepSize, SETTINGS.physicsIter, SETTINGS.physicsIter);
-                accumulator -= physicsStepSize;
-                steps++;
+                accumulator -= physicsStepSize; steps++;
             }
             if(accumulator > physicsStepSize) accumulator = 0;
 
             if (!gameState.gameOver && !gameState.debug) {
                 gameState.fuel -= (0.5 + Math.abs(input.throttle) * 2) * dt; 
-                if (gameState.fuel <= 0) { 
-                    gameState.fuel = 0; 
-                    if(Math.abs(vehicle.chassis.getLinearVelocity().x) < 0.5) gameState.gameOver = true; 
-                }
+                if (gameState.fuel <= 0) { gameState.fuel = 0; if(Math.abs(vehicle.chassis.getLinearVelocity().x) < 0.5) gameState.gameOver = true; }
             }
 
             for (let b = world.getBodyList(); b; b = b.getNext()) {
                 const ud = b.getUserData();
                 if (ud && ud.mesh) {
                     const p = b.getPosition();
-                    const a = b.getAngle();
-                    ud.mesh.position.set(p.x, p.y, 0);
-                    ud.mesh.rotation.z = a;
-                    
+                    ud.mesh.position.set(p.x, p.y, 0); ud.mesh.rotation.z = b.getAngle();
                     if(ud.type === 'fuel' || ud.type === 'checkpoint') {
-                        ud.mesh.rotation.y += dt;
-                        ud.mesh.position.y = ud.originalY + Math.sin(time/500 + ud.mesh.userData.floatOffset) * 0.2;
+                        ud.mesh.rotation.y += dt; ud.mesh.position.y = ud.originalY + Math.sin(time/500 + ud.mesh.userData.floatOffset) * 0.2;
                     }
                 }
             }
             
+            if (vehicle && vehicle.updateVisuals) vehicle.updateVisuals();
+            
             const cp = vehicle.chassis.getPosition();
-            camera.position.x = cp.x + 8;
-            camera.position.y = cp.y + 5;
-            camera.position.z = SETTINGS.cameraZoom;
+            camera.position.set(cp.x + 8, cp.y + 5, SETTINGS.cameraZoom);
             camera.lookAt(cp.x + 6, cp.y, 0);
 
             terrainManager.update(cp.x);
@@ -855,32 +701,24 @@ window.addEventListener('load', () => {
 
             if(time - lastUIUpdate > 100) {
                 lastUIUpdate = time;
-
                 document.getElementById('speed-value').innerText = Math.floor(vehicle.chassis.getLinearVelocity().length() * 3.6);
                 document.getElementById('rpm-value').innerText = Math.floor(Math.abs(vehicle.rear.getAngularVelocity()) * 9.55);
-                
-                const torque = input.throttle ? input.throttle * VEHICLE_PARAMS.MOTOR_TORQUE : 0;
-                document.getElementById('torque-value').innerText = Math.floor(torque);
-                
+                document.getElementById('torque-value').innerText = Math.floor(input.throttle ? input.throttle * VEHICLE_PARAMS.MOTOR_TORQUE : 0);
                 const angleRad = vehicle.chassis.getAngle();
-                const angleDeg = (angleRad * 180 / Math.PI) % 360;
-                document.getElementById('angle-value').innerText = angleDeg.toFixed(1);
+                document.getElementById('angle-value').innerText = ((angleRad * 180 / Math.PI) % 360).toFixed(1);
                 
                 let slopeVal = Math.tan(angleRad) * 100;
                 if(Math.abs(slopeVal) > 999) slopeVal = 999 * Math.sign(slopeVal); 
                 document.getElementById('slope-value').innerText = slopeVal.toFixed(1);
 
                 document.getElementById('fuel-value').innerText = Math.floor(gameState.fuel);
-                
                 gameState.distance = Math.max(gameState.distance, cp.x);
                 document.getElementById('distance-value').innerText = Math.floor(gameState.distance);
-                
                 document.getElementById('phys-debug').innerText = `${SETTINGS.physicsHz}Hz/${SETTINGS.physicsIter}it`;
                 
                 if (gameState.gameOver) document.getElementById('game-over-panel').classList.remove('hidden');
             }
         }
-        
         renderer.render(scene, camera);
     }
 
