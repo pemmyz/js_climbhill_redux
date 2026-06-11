@@ -29,16 +29,18 @@ window.addEventListener('load', () => {
     const VEHICLE_CONFIGS = {
         moped: {
             CHASSIS_DENSITY: 40,
-            WHEEL_MASS: 6, WHEEL_RADIUS: 0.38, WHEEL_FRICTION: 2.2, WHEEL_RESTITUTION: 0.05,
-            TRACK_WIDTH: 2.0, // Updated to 2.0m
+            WHEEL_MASS: 6, WHEEL_FRICTION: 2.2, WHEEL_RESTITUTION: 0.05,
+            FRONT_WHEEL_RADIUS: 0.38, REAR_WHEEL_RADIUS: 0.38,
+            FRONT_WHEEL_X: 1.0, REAR_WHEEL_X: -1.0,
             SUSPENSION_FREQ_HZ: 3.5, SUSPENSION_DAMPING_RATIO: 0.35, SUSPENSION_TRAVEL: 0.5,
             MOTOR_TORQUE: 750, MOTOR_MAX_SPEED: 80, BRAKE_TORQUE: 900,
             AIR_CONTROL_TORQUE: 900, AIR_CONTROL_DAMPING: 25
         },
         car: {
             CHASSIS_DENSITY: 60,
-            WHEEL_MASS: 12, WHEEL_RADIUS: 0.35, WHEEL_FRICTION: 1.6, WHEEL_RESTITUTION: 0.05,
-            TRACK_WIDTH: 2.0, // Updated to 2.0m
+            WHEEL_MASS: 12, WHEEL_FRICTION: 1.6, WHEEL_RESTITUTION: 0.05,
+            FRONT_WHEEL_RADIUS: 0.35, REAR_WHEEL_RADIUS: 0.35,
+            FRONT_WHEEL_X: 1.0, REAR_WHEEL_X: -1.0,
             SUSPENSION_FREQ_HZ: 2.0, SUSPENSION_DAMPING_RATIO: 0.45, SUSPENSION_TRAVEL: 0.35,
             MOTOR_TORQUE: 900, MOTOR_MAX_SPEED: 70, BRAKE_TORQUE: 1800,
             AIR_CONTROL_TORQUE: 1800, AIR_CONTROL_DAMPING: 30
@@ -48,10 +50,23 @@ window.addEventListener('load', () => {
 
     const VEHICLE_PARAMS = {};
 
+    function updateWheelUI() {
+        document.getElementById('front-wheel-x-slider').value = VEHICLE_PARAMS.FRONT_WHEEL_X;
+        document.getElementById('front-wheel-x-display').innerText = VEHICLE_PARAMS.FRONT_WHEEL_X.toFixed(2);
+        
+        document.getElementById('rear-wheel-x-slider').value = VEHICLE_PARAMS.REAR_WHEEL_X;
+        document.getElementById('rear-wheel-x-display').innerText = VEHICLE_PARAMS.REAR_WHEEL_X.toFixed(2);
+        
+        document.getElementById('front-wheel-r-slider').value = VEHICLE_PARAMS.FRONT_WHEEL_RADIUS;
+        document.getElementById('front-wheel-r-display').innerText = VEHICLE_PARAMS.FRONT_WHEEL_RADIUS.toFixed(2);
+        
+        document.getElementById('rear-wheel-r-slider').value = VEHICLE_PARAMS.REAR_WHEEL_RADIUS;
+        document.getElementById('rear-wheel-r-display').innerText = VEHICLE_PARAMS.REAR_WHEEL_RADIUS.toFixed(2);
+    }
+
     function applyVehiclePreset(profile) {
         Object.assign(VEHICLE_PARAMS, VEHICLE_CONFIGS[profile]);
-        document.getElementById('track-width-slider').value = VEHICLE_PARAMS.TRACK_WIDTH;
-        document.getElementById('track-width-display').innerText = VEHICLE_PARAMS.TRACK_WIDTH.toFixed(1);
+        updateWheelUI();
     }
     
     applyVehiclePreset(SETTINGS.physicsProfile);
@@ -319,14 +334,26 @@ window.addEventListener('load', () => {
                 rebuildVehicleWithState();
             });
 
-            const widthSlider = document.getElementById('track-width-slider');
-            const widthDisp = document.getElementById('track-width-display');
-            widthSlider.addEventListener('input', (e) => {
-                const val = parseFloat(e.target.value);
-                widthDisp.innerText = val.toFixed(1);
-                VEHICLE_PARAMS.TRACK_WIDTH = val;
+            const bindSlider = (id, paramKey) => {
+                const slider = document.getElementById(`${id}-slider`);
+                const disp = document.getElementById(`${id}-display`);
+                slider.addEventListener('input', (e) => {
+                    const val = parseFloat(e.target.value);
+                    disp.innerText = val.toFixed(2);
+                    VEHICLE_PARAMS[paramKey] = val;
+                    rebuildVehicleWithState();
+                });
+            };
+
+            bindSlider('front-wheel-x', 'FRONT_WHEEL_X');
+            bindSlider('rear-wheel-x', 'REAR_WHEEL_X');
+            bindSlider('front-wheel-r', 'FRONT_WHEEL_RADIUS');
+            bindSlider('rear-wheel-r', 'REAR_WHEEL_RADIUS');
+
+            document.getElementById('restore-defaults-btn').onclick = () => {
+                applyVehiclePreset(SETTINGS.physicsProfile);
                 rebuildVehicleWithState();
-            });
+            };
 
             document.getElementById('suspension-select').addEventListener('change', (e) => SETTINGS.suspension = e.target.value);
             
@@ -477,7 +504,7 @@ window.addEventListener('load', () => {
         // Build Visuals based on Visual Type
         if (visType === 'car') {
             const carShape = new THREE.Shape();
-            const drawRW = -vp.TRACK_WIDTH/2, drawFW = vp.TRACK_WIDTH/2;
+            const drawRW = vp.REAR_WHEEL_X, drawFW = vp.FRONT_WHEEL_X;
             carShape.moveTo(-1.3, -0.3); 
             carShape.lineTo(drawRW - 0.55, -0.3); carShape.lineTo(drawRW - 0.35, -0.05); carShape.lineTo(drawRW + 0.35, -0.05); carShape.lineTo(drawRW + 0.55, -0.3);  
             carShape.lineTo(drawFW - 0.55, -0.3); carShape.lineTo(drawFW - 0.35, -0.05); carShape.lineTo(drawFW + 0.35, -0.05); carShape.lineTo(drawFW + 0.55, -0.3);
@@ -553,10 +580,10 @@ window.addEventListener('load', () => {
         chassis.setAngle(angle);
 
         // Wheels
-        const makeWheel = (xOffset, isFront, label) => {
+        const makeWheel = (xOffset, radius, isFront, label) => {
             const anchorVec = Vec2(xOffset, -1);
             const wheelBody = world.createDynamicBody({ position: chassis.getWorldPoint(anchorVec), angularDamping: 0.1 });
-            wheelBody.createFixture(pl.Circle(vp.WHEEL_RADIUS), { density: vp.WHEEL_MASS, friction: vp.WHEEL_FRICTION, restitution: vp.WHEEL_RESTITUTION, filterGroupIndex: -1, userData: { type: 'wheel', wheelId: label, owner: null } });
+            wheelBody.createFixture(pl.Circle(radius), { density: vp.WHEEL_MASS, friction: vp.WHEEL_FRICTION, restitution: vp.WHEEL_RESTITUTION, filterGroupIndex: -1, userData: { type: 'wheel', wheelId: label, owner: null } });
             
             // Realistic raked front fork tied to physics profile so moped physics always clmbs well
             let axisVec = Vec2(0, 1);
@@ -571,16 +598,16 @@ window.addEventListener('load', () => {
             let wGeo, wMat, wMesh;
             // Draw visually selected wheel
             if (visType === 'car') {
-                wGeo = new THREE.CylinderGeometry(vp.WHEEL_RADIUS, vp.WHEEL_RADIUS, 0.4, 16); wGeo.rotateX(Math.PI / 2);
+                wGeo = new THREE.CylinderGeometry(radius, radius, 0.4, 16); wGeo.rotateX(Math.PI / 2);
                 wMesh = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({ color: 0x222222 }));
-                wMesh.add(new THREE.Mesh(new THREE.BoxGeometry(vp.WHEEL_RADIUS*1.5, 0.1, 0.45), new THREE.MeshStandardMaterial({color: 0x888888})));
+                wMesh.add(new THREE.Mesh(new THREE.BoxGeometry(radius*1.5, 0.1, 0.45), new THREE.MeshStandardMaterial({color: 0x888888})));
             } else {
-                wGeo = new THREE.CylinderGeometry(vp.WHEEL_RADIUS, vp.WHEEL_RADIUS, 0.15, 24); wGeo.rotateX(Math.PI / 2);
+                wGeo = new THREE.CylinderGeometry(radius, radius, 0.15, 24); wGeo.rotateX(Math.PI / 2);
                 wMesh = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({ color: 0x111111 }));
-                const rim = new THREE.Mesh(new THREE.CylinderGeometry(vp.WHEEL_RADIUS*0.8, vp.WHEEL_RADIUS*0.8, 0.16, 24).rotateX(Math.PI/2), new THREE.MeshStandardMaterial({color: 0x777777}));
+                const rim = new THREE.Mesh(new THREE.CylinderGeometry(radius*0.8, radius*0.8, 0.16, 24).rotateX(Math.PI/2), new THREE.MeshStandardMaterial({color: 0x777777}));
                 wMesh.add(rim);
                 for(let i=0; i<3; i++) {
-                    const spoke = new THREE.Mesh(new THREE.BoxGeometry(vp.WHEEL_RADIUS*1.6, 0.17, 0.02), new THREE.MeshStandardMaterial({color:0xdddddd}));
+                    const spoke = new THREE.Mesh(new THREE.BoxGeometry(radius*1.6, 0.17, 0.02), new THREE.MeshStandardMaterial({color:0xdddddd}));
                     spoke.rotation.z = (Math.PI/3) * i; wMesh.add(spoke);
                 }
             }
@@ -590,8 +617,8 @@ window.addEventListener('load', () => {
             return { body: wheelBody, joint: joint, mesh: wMesh };
         };
 
-        const rear = makeWheel(-vp.TRACK_WIDTH/2, false, 'rear');
-        const front = makeWheel(vp.TRACK_WIDTH/2, true, 'front');
+        const rear = makeWheel(vp.REAR_WHEEL_X, vp.REAR_WHEEL_RADIUS, false, 'rear');
+        const front = makeWheel(vp.FRONT_WHEEL_X, vp.FRONT_WHEEL_RADIUS, true, 'front');
 
         const obj = {
             chassis, rear: rear.body, front: front.body, rJoint: rear.joint, fJoint: front.joint,
@@ -605,7 +632,7 @@ window.addEventListener('load', () => {
             
             reset(pos) {
                 this.chassis.setPosition(pos); this.chassis.setAngle(0); this.chassis.setLinearVelocity(Vec2(0,0)); this.chassis.setAngularVelocity(0);
-                const rPos = chassis.getWorldPoint(Vec2(-vp.TRACK_WIDTH/2, -1)), fPos = chassis.getWorldPoint(Vec2(vp.TRACK_WIDTH/2, -1));
+                const rPos = chassis.getWorldPoint(Vec2(vp.REAR_WHEEL_X, -1)), fPos = chassis.getWorldPoint(Vec2(vp.FRONT_WHEEL_X, -1));
                 this.rear.setPosition(rPos); this.rear.setLinearVelocity(Vec2(0,0)); this.rear.setAngularVelocity(0);
                 this.front.setPosition(fPos); this.front.setLinearVelocity(Vec2(0,0)); this.front.setAngularVelocity(0);
             },
