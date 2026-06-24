@@ -4,6 +4,7 @@ window.addEventListener('load', () => {
 
 // --- CONFIGURATION ---
     const SETTINGS = {
+        mapType: 'new',          // Current map selection ('new' or 'classic')
         vehicleType: 'moped',    // Visual appearance (meshes, hitboxes)
         physicsProfile: 'car',   // Physical behavior (mass, torque, joints)
         
@@ -334,6 +335,13 @@ window.addEventListener('load', () => {
                 rebuildVehicleWithState();
             });
 
+            document.getElementById('map-select').addEventListener('change', (e) => {
+                SETTINGS.mapType = e.target.value;
+                gameState.lastCheckpoint = null; // force full reset back to start line
+                terrainManager.reset();
+                this.handleReset();
+            });
+
             const bindSlider = (id, paramKey) => {
                 const slider = document.getElementById(`${id}-slider`);
                 const disp = document.getElementById(`${id}-display`);
@@ -419,8 +427,20 @@ window.addEventListener('load', () => {
     // --- TERRAIN & VEGETATION ---
     function createTerrainManager() {
         let segments = [], lastGenX = -TERRAIN.SEGMENT_LEN, lastChk = 0, lastFuel = 0;
-        const seed = Math.random() * 1000, A1 = 0.8, F1 = 0.4, A2 = 0.3, F2 = 1.2;
-        const heightFn = x => A1 * Math.sin(F1 * x + seed) + A2 * Math.sin(F2 * x + seed + 100);
+        let seed = Math.random() * 1000;
+        let startOffset = 0;
+        
+        const rawHeight = (x) => {
+            if (SETTINGS.mapType === 'classic') {
+                return 0.8 * Math.sin(0.4 * x + seed) + 0.3 * Math.sin(1.2 * x + seed + 100);
+            } else {
+                // New map: Much taller, slower, rolling hills combined with small noise
+                return 6.0 * Math.sin(0.03 * x + seed) + 2.5 * Math.sin(0.08 * x + seed + 50) + 0.5 * Math.sin(0.3 * x + seed + 20);
+            }
+        };
+
+        // Ensures the vehicle always starts cleanly at Y=0 regardless of seed height
+        const heightFn = x => rawHeight(x) - startOffset;
 
         const createGrass = (pathPoints) => {
             const count = 100, geo = new THREE.PlaneGeometry(0.5, 0.8); geo.translate(0, 0.4, 0); 
@@ -469,14 +489,35 @@ window.addEventListener('load', () => {
         }
 
         return {
-            init() { generateSegment(-TERRAIN.SEGMENT_LEN); generateSegment(0); },
+            init() { 
+                seed = Math.random() * 1000;
+                startOffset = rawHeight(0);
+                generateSegment(-TERRAIN.SEGMENT_LEN); 
+                generateSegment(0); 
+            },
             update(camX) {
                 if (camX > lastGenX - 200) generateSegment(lastGenX);
                 if (segments.length > 0 && camX > segments[0].endX + 150) {
                     const s = segments.shift(); scene.remove(s.body.getUserData().mesh); if(s.grass) scene.remove(s.grass); world.destroyBody(s.body);
                 }
             },
-            refreshGraphics() { const m = SETTINGS.graphics === 'modern'; segments.forEach(s => { if(s.grass) s.grass.visible = m; }); }
+            refreshGraphics() { const m = SETTINGS.graphics === 'modern'; segments.forEach(s => { if(s.grass) s.grass.visible = m; }); },
+            reset() {
+                // Safely destroy all terrain and item bodies
+                let b = world.getBodyList();
+                while (b) {
+                    let next = b.getNext();
+                    const ud = b.getUserData();
+                    if (ud && (ud.type === 'ground' || ud.type === 'checkpoint' || ud.type === 'fuel')) {
+                        if (ud.mesh) scene.remove(ud.mesh);
+                        if (ud.grass) scene.remove(ud.grass);
+                        world.destroyBody(b);
+                    }
+                    b = next;
+                }
+                segments = []; lastGenX = -TERRAIN.SEGMENT_LEN; lastChk = 0; lastFuel = 0;
+                this.init();
+            }
         };
     }
 
@@ -585,7 +626,7 @@ window.addEventListener('load', () => {
             const wheelBody = world.createDynamicBody({ position: chassis.getWorldPoint(anchorVec), angularDamping: 0.1 });
             wheelBody.createFixture(pl.Circle(radius), { density: vp.WHEEL_MASS, friction: vp.WHEEL_FRICTION, restitution: vp.WHEEL_RESTITUTION, filterGroupIndex: -1, userData: { type: 'wheel', wheelId: label, owner: null } });
             
-            // Realistic raked front fork tied to physics profile so moped physics always clmbs well
+            // Realistic raked front fork tied to physics profile so moped physics always climbs well
             let axisVec = Vec2(0, 1);
             if (physType === 'moped' && isFront) { axisVec = Vec2(-0.25, 1); axisVec.normalize(); }
 
