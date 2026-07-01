@@ -7,6 +7,7 @@ window.addEventListener('load', () => {
         mapType: 'new',          // Current map selection ('new' or 'classic')
         vehicleType: 'moped',    // Visual appearance (meshes, hitboxes)
         physicsProfile: 'car',   // Physical behavior (mass, torque, joints)
+        spinMode: 'enhanced',    // Air spin behavior ('original' or 'enhanced')
         
         graphics: 'modern', 
         cameraZoom: 28,
@@ -334,6 +335,13 @@ window.addEventListener('load', () => {
                 applyVehiclePreset(SETTINGS.physicsProfile);
                 rebuildVehicleWithState();
             });
+
+            const spinModeSelect = document.getElementById('spin-mode-select');
+            if (spinModeSelect) {
+                spinModeSelect.addEventListener('change', (e) => {
+                    SETTINGS.spinMode = e.target.value;
+                });
+            }
 
             document.getElementById('map-select').addEventListener('change', (e) => {
                 SETTINGS.mapType = e.target.value;
@@ -680,10 +688,21 @@ window.addEventListener('load', () => {
             
             update(dt, input) {
                 if (input.throttle) {
-                    this.rJoint.enableMotor(true); this.rJoint.setMotorSpeed(-input.throttle * vp.MOTOR_MAX_SPEED); this.rJoint.setMaxMotorTorque(vp.MOTOR_TORQUE);
+                    this.rJoint.enableMotor(true); 
+                    this.rJoint.setMotorSpeed(-input.throttle * vp.MOTOR_MAX_SPEED); 
+                    
+                    let applyTorque = vp.MOTOR_TORQUE;
+                    // If enhanced mode is active and the drive wheel is off the ground, drastically reduce
+                    // the motor's max torque to prevent the chassis from spinning out of control.
+                    if (SETTINGS.spinMode === 'enhanced' && this.grounded.rear <= 0) {
+                        applyTorque = vp.MOTOR_TORQUE * 0.1;
+                    }
+                    this.rJoint.setMaxMotorTorque(applyTorque);
                 } else {
-                    this.rJoint.enableMotor(false); if (this.grounded.rear > 0) this.rear.applyTorque(-this.rear.getAngularVelocity() * 10, true);
+                    this.rJoint.enableMotor(false); 
+                    if (this.grounded.rear > 0) this.rear.applyTorque(-this.rear.getAngularVelocity() * 10, true);
                 }
+                
                 if (input.brake) {
                     this.rear.applyTorque(clamp(-this.rear.getAngularVelocity()*120, -vp.BRAKE_TORQUE, vp.BRAKE_TORQUE), true);
                     this.front.applyTorque(clamp(-this.front.getAngularVelocity()*120, -vp.BRAKE_TORQUE, vp.BRAKE_TORQUE), true);
